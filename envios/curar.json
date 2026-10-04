@@ -1,0 +1,7 @@
+{
+  "desde": 1984,
+  "hasta": 1995,
+  "pais": "Argentina",
+  "por_año": { "juegos": 4, "programas": 1, "videos": 3, "revistas": 2, "musica": 2, "decoracion": 2 },
+  "juegos_de_archive": false
+}
