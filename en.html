@@ -56,10 +56,14 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .mlist li button:hover, .mlist li button:focus-visible { background: #241c14; outline: none; }
 .mlist li button[aria-current] { color: var(--phosphor); }
 .mlist small { color: #8a7a60; }
+#lootList li { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #241c14; padding: 4px 6px 4px 10px; }
+#lootList li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lootList li button { width: auto; border: 1px solid #5a4630; border-radius: 4px; padding: 2px 10px; background: #241a10; }
+#lootList li.empty { color: #8a7a60; }
 #lList { max-height: 30vh; overflow: auto; display: grid; gap: 4px; font-size: 18px; color: #c9b896; }
 #lList .lrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #lList .lrow .cbtn { padding: 0 8px; font-size: 16px; }
-#screenUI .cbox { width: min(640px, 100%); }
+#screenUI .cbox, #lootUI .cbox { width: min(640px, 100%); }
 #readerUI .cbox { width: min(1200px, 100%); max-height: calc(100vh - 32px); overflow: auto; gap: 8px; padding: 14px 20px; }
 #readerUI .rpages { display: flex; justify-content: center; gap: 2px; height: min(calc(100vh - 210px), 1000px); min-height: 240px; }
 #readerUI canvas { height: 100%; max-width: 50%; object-fit: contain; background: #e9e1cf; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6); }
@@ -128,10 +132,11 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div class="hud" id="hint" hidden>Click to use the computer</div>
 <div class="hud" id="help" hidden>
   <kbd>W A S D</kbd> float · <kbd>Q</kbd> up · <kbd>E</kbd> down · <kbd>Shift</kbd> faster · <kbd>mouse</kbd> look around<br>
-  click grabs and drops things · <kbd>middle button</kbd> throws it forward · wheel brings what you hold closer or farther<br>
+  click grabs and drops things · <kbd>middle button</kbd> throws it (hold longer for more force) · wheel brings what you hold closer or farther<br>
   <kbd>right button</kbd> + mouse turns what you hold · + scroll wheel tilts it<br>
   click the computer to use it · <kbd>Esc</kbd> get up<br>
   <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine · <kbd>L</kbd> lights · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
+  <kbd>X</kbd> discards what you hold or look at · <kbd>Z</kbd> brings it back<br>
   aim at a wall with something in hand to stick it with velcro · <kbd>Shift</kbd>+click drops it without sticking
 </div>
 <div class="hud" id="termHelp" hidden>
@@ -182,6 +187,14 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     <label>Library</label>
     <ol id="mList" class="mlist"></ol>
     <div class="crow"><button id="mLoad" class="cbtn">Load your own music</button><button id="mClose" class="btn">Back (Esc)</button></div>
+  </div>
+</div>
+<div id="lootUI" class="cpanel" hidden>
+  <div class="cbox">
+    <h2 id="lootTitle">Capsule</h2>
+    <p class="lnote">Pick what to take out. The rest stays in the capsule until you open it again (double click).</p>
+    <ol id="lootList" class="mlist"></ol>
+    <div class="crow"><button id="lootAll" class="cbtn">Take everything</button><button id="lootClose" class="btn">Back (Esc)</button></div>
   </div>
 </div>
 <div id="navUI" class="cpanel" hidden>
@@ -245,11 +258,13 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <dt>Get up</dt><dd>Esc</dd>
       <dt>Time</dt><dd>T speeds up the orbit ×30</dd>
       <dt>Music</dt><dd>the cassette deck, at the back on the right (P)</dd>
+      <dt>Discard</dt><dd>X discards what you hold, Z brings it back</dd>
     </dl>
         <div class="origin">
       <label for="pais">Region you're studying</label><select id="pais"></select>
       <label class="chk"><input type="checkbox" id="aoRandom"> Random salvage from archive.org (needs internet)</label>
       <label class="chk"><input type="checkbox" id="showHints"> Show what things do when you aim at them</label>
+      <label class="chk"><input type="checkbox" id="lootPick"> Pick what to take out of each capsule (otherwise everything comes out)</label>
     </div>
       </div>
       <div class="col">
@@ -812,7 +827,30 @@ function addItem(id, kind, g, pos, opts = {}) {
   g.traverse((m) => { if (m.isMesh) { itemByMesh.set(m, it); itemMeshes.push(m); m.castShadow = true; m.receiveShadow = true; } });
   scene.add(g);
   items.push(it);
+  if (it.stuck) layerStuck(it);
   return it;
+}
+// dos cosas pegadas en el mismo lugar y a la misma altura parpadean (z-fighting):
+// la última que se pega queda medio centímetro por delante de lo que se superpone con ella
+const _ln = new THREE.Vector3(), _lo = new THREE.Vector3(), _lb1 = new THREE.Box3(), _lb2 = new THREE.Box3();
+function layerStuck(it) {
+  it.g.updateMatrixWorld(true);
+  _ln.set(0, 1, 0).applyQuaternion(it.g.quaternion);
+  for (let pass = 0; pass < 12; pass++) {
+    let moved = false;
+    _lb1.setFromObject(it.g).expandByScalar(-0.005);
+    for (const o of items) {
+      if (o === it || !o.stuck || o.gone || o.held) continue;
+      if (_lo.set(0, 1, 0).applyQuaternion(o.g.quaternion).dot(_ln) < 0.95) continue;
+      const along = _lo.subVectors(it.g.position, o.g.position).dot(_ln);
+      if (along >= 0.0035 || along < -0.03) continue;
+      if (!_lb1.intersectsBox(_lb2.setFromObject(o.g))) continue;
+      it.g.position.addScaledVector(_ln, 0.005 - along);
+      it.g.updateMatrixWorld(true);
+      moved = true; break;
+    }
+    if (!moved) break;
+  }
 }
 const itemById = (id) => items.find((it) => it.id === id && !it.gone);
 
@@ -871,15 +909,75 @@ function updateItems(dt) {
       return;
     }
     if (it.vel.lengthSq() < 1e-7 && it.spin.lengthSq() < 1e-7) return;
-    it.g.position.addScaledVector(it.vel, dt);
+    // en pasos chicos, para que lo rápido no atraviese lo finito
+    localBox(it);
+    const steps = Math.min(8, Math.max(1, Math.ceil(it.vel.length() * dt / (it.crad * 0.5))));
+    for (let k = 0; k < steps; k++) {
+      it.g.position.addScaledVector(it.vel, dt / steps);
+      constrainPoint(it.g.position, it.vel, it.radius);
+      shelfConstrain(it.g.position, it.vel, it.radius);
+      collideItems(it);
+    }
     it.g.rotation.x += it.spin.x * dt; it.g.rotation.y += it.spin.y * dt; it.g.rotation.z += it.spin.z * dt;
     it.vel.multiplyScalar(damp); it.spin.multiplyScalar(damp);
-    constrainPoint(it.g.position, it.vel, it.radius);
-    shelfConstrain(it.g.position, it.vel, it.radius);
     if (it.vel.lengthSq() < 1e-6) it.vel.set(0, 0, 0);
     if (it.spin.lengthSq() < 1e-5) it.spin.set(0, 0, 0);
     it.dirty = true;
   });
+}
+// choques entre objetos: el que se mueve es una esfera del tamaño de su lado más corto
+// y choca contra la caja real (orientada) de los demás; así una revista se apoya sobre una caja
+const _cbox = new THREE.Box3(), _cp = new THREE.Vector3(), _cq = new THREE.Vector3(), _cn = new THREE.Vector3(), _cinv = new THREE.Matrix4();
+function localBox(it) {
+  const now = performance.now();
+  if (it.lbox && now - it.lboxAt < 3000) return it.lbox;
+  const g = it.g, p = g.position.clone(), q = g.quaternion.clone(), par = g.parent;
+  g.position.set(0, 0, 0); g.quaternion.identity(); g.updateMatrixWorld(true);
+  if (par) { g.matrixWorld.copy(g.matrix); g.children.forEach((c) => c.updateMatrixWorld(true)); }
+  it.lbox = new THREE.Box3().setFromObject(g); it.lboxAt = now;
+  const sz = it.lbox.getSize(new THREE.Vector3()), dims = [sz.x, sz.y, sz.z].sort((a, b) => a - b);
+  it.crad = Math.max(it.radius, Math.min(0.12, dims[1] / 2));
+  it.brad = it.lbox.getBoundingSphere(new THREE.Sphere()).radius + it.lbox.getCenter(_cq).length();
+  g.position.copy(p); g.quaternion.copy(q); g.updateMatrixWorld(true);
+  return it.lbox;
+}
+function collideItems(it) {
+  if (it.noCollideUntil && performance.now() < it.noCollideUntil) return;
+  localBox(it);
+  const r = it.crad, P = it.g.position;
+  for (const o of items) {
+    if (o === it || o.gone || o.inDrive || o.held || o.expelling || o.tween) continue;
+    if (o.kind === 'crate' && it.kind !== 'crate' && it.fromCrate === o.id && performance.now() < (it.noCollideUntil || 0) + 4000) continue;
+    const lb = localBox(o);
+    if (P.distanceTo(o.g.position) > r + o.brad) continue;
+    // centro del que se mueve, en el marco del otro
+    _cinv.copy(o.g.matrixWorld).invert();
+    _cp.copy(P).applyMatrix4(_cinv);
+    lb.clampPoint(_cp, _cq);
+    let pen = 0;
+    if (_cq.distanceToSquared(_cp) > 1e-10) {
+      _cn.subVectors(_cp, _cq); const d = _cn.length();
+      if (d >= r) continue;
+      _cn.divideScalar(d); pen = r - d;
+    } else {
+      // el centro quedó adentro: sale por la cara más cercana de las que miran hacia donde venía
+      const dx = [lb.max.x - _cp.x, _cp.x - lb.min.x], dy = [lb.max.y - _cp.y, _cp.y - lb.min.y], dz = [lb.max.z - _cp.z, _cp.z - lb.min.z];
+      _cq.copy(it.vel).transformDirection(_cinv);
+      const opts = [[dx[0], 1, 0, 0], [dx[1], -1, 0, 0], [dy[0], 0, 1, 0], [dy[1], 0, -1, 0], [dz[0], 0, 0, 1], [dz[1], 0, 0, -1]]
+        .map((o) => [o[0] + (it.vel.lengthSq() > 1e-6 && o[1] * _cq.x + o[2] * _cq.y + o[3] * _cq.z > 0 ? 10 : 0), o[1], o[2], o[3], o[0]]).sort((a, b) => a[0] - b[0]);
+      _cn.set(opts[0][1], opts[0][2], opts[0][3]); pen = opts[0][4] + r;
+    }
+    _cn.transformDirection(o.g.matrixWorld);
+    const free = !o.stuck && !o.tween && o.kind !== 'crate';
+    P.addScaledVector(_cn, free ? pen * 0.5 : pen);
+    if (free) { o.g.position.addScaledVector(_cn, -pen * 0.5); o.dirty = true; }
+    const vn = it.vel.dot(_cn) - (free ? o.vel.dot(_cn) : 0);
+    if (vn < 0) {
+      if (free) { it.vel.addScaledVector(_cn, -vn * 0.65); o.vel.addScaledVector(_cn, vn * 0.65); }
+      else it.vel.addScaledVector(_cn, -vn * 1.3);
+      it.spin.multiplyScalar(0.8);
+    }
+  }
 }
 // sostener: el objeto sigue un punto con un resorte suave; al soltar conserva un poquito de su velocidad
 const held = { it: null, target: new THREE.Vector3(), dist: 0.75, last: new THREE.Vector3(), v: new THREE.Vector3(), rel: new THREE.Quaternion(), rotating: false };
@@ -902,12 +1000,44 @@ function releaseItem() {
   saveItems();
   return it;
 }
+// desechar (X): lo que tenés o lo que mirás se va por el conducto de desechos; Z lo trae de vuelta un rato
+let lastDiscard = null;
+function discardItem() {
+  const it = held.it || (aimed && aimed.item && !aimed.item.inDrive && !aimed.item.expelling ? aimed.item : null);
+  if (!it) { toast('Grab something or aim at it to discard it.', 3000); return; }
+  if (held.it === it) { it.held = false; held.it = null; held.rotating = false; }
+  it.gone = true; it.stuck = false; it.tween = null; it.vel.set(0, 0, 0); it.spin.set(0, 0, 0);
+  scene.remove(it.g);
+  lastDiscard = { it, at: performance.now() };
+  noiseBurst(0.45, 'bandpass', 700, 0.35, 0.7);
+  saveItems(); drawAirPanel();
+  toast('Sent ' + it.label + ' to the trash. Z brings it back.', 7000);
+}
+function undoDiscard() {
+  const d = lastDiscard;
+  if (!d || performance.now() - d.at > 60000) return;
+  lastDiscard = null;
+  const it = d.it;
+  it.gone = false;
+  const dir = camera.getWorldDirection(new THREE.Vector3());
+  it.g.position.copy(camera.position).addScaledVector(dir, 0.7);
+  constrainPoint(it.g.position, it.vel, it.radius, 0);
+  scene.add(it.g);
+  click(); saveItems(); drawAirPanel();
+  toast('Back: ' + it.label + '.', 3000);
+}
 // tirar lo que tenés hacia adelante (botón del medio): sale flotando hasta chocar con algo
-function throwHeld() {
+const CHARGE = { at: 0, max: 1.5 };
+let noAimUntil = 0;
+const chargeK = () => (CHARGE.at ? Math.min(1, (performance.now() - CHARGE.at) / 1000 / CHARGE.max) : 0);
+function throwHeld(k = 0.35) {
   const it = releaseItem();
+  CHARGE.at = 0;
   if (!it) return;
   const dir = camera.getWorldDirection(new THREE.Vector3());
-  it.vel.copy(dir).multiplyScalar(it.kind === 'crate' ? 1.6 : 2.6).addScaledVector(player.vel, 0.5);
+  // después de tirar, un ratito no se marca ni se agarra nada
+  noAimUntil = performance.now() + 700;
+  it.vel.copy(dir).multiplyScalar((it.kind === 'crate' ? 0.6 : 1) * (1.5 + 6 * k)).addScaledVector(player.vel, 0.5);
   it.spin.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
   click();
 }
@@ -1388,7 +1518,9 @@ const _up = new THREE.Vector3(), _bx = new THREE.Vector3(), _bz = new THREE.Vect
 function aimStick() {
   stickAim.ok = false;
   if (!held.it || !structMeshes.length) return;
-  const hit = raycaster.intersectObjects(structMeshes, false)[0];
+  // también sobre otros objetos pegados o quietos: así se apilan
+  const stackable = itemMeshes.filter((m) => { const o = itemByMesh.get(m); return o && o !== held.it && !o.gone && !o.inDrive && !o.expelling && o.kind !== 'crate' && (o.stuck || (o.vel.lengthSq() < 1e-6 && !o.tween)); });
+  const hit = raycaster.intersectObjects(structMeshes.concat(stackable), false)[0];
   if (!hit || hit.distance > 2.2 || !hit.face) return;
   stickAim.normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).normalize();
   if (stickAim.normal.dot(raycaster.ray.direction) > 0) stickAim.normal.negate();
@@ -1415,7 +1547,7 @@ function stickHeld() {
   const half = it.data.half != null ? it.data.half : it.radius;
   const to = stickAim.point.clone().addScaledVector(n, half + 0.003);
   it.vel.set(0, 0, 0); it.spin.set(0, 0, 0);
-  it.tween = { t: 0, from: it.g.position.clone(), to, q0: it.g.quaternion.clone(), q1, done: () => { it.stuck = true; saveItems(); } };
+  it.tween = { t: 0, from: it.g.position.clone(), to, q0: it.g.quaternion.clone(), q1, done: () => { it.stuck = true; layerStuck(it); saveItems(); } };
   noiseBurst(0.18, 'highpass', 2500, 0.18, 0.8);
   return true;
 }
@@ -1468,7 +1600,9 @@ function makeGameBoxMesh(name, year, kind, coverUrl) {
   // caras: +x, -x, +y (tapa), -y, +z, -z
   const body = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [spineMat, back, coverMat, back, back, back]);
   body.position.y = T / 2; g.add(body);
-  if (coverUrl) new THREE.TextureLoader().load(coverUrl, (t) => { coverMat.map = t; coverMat.needsUpdate = true; });
+  // la tapa de archive.org es una imagen de la primera página; su servidor no deja usarla como textura,
+  // así que si falla directo se pide a través de wsrv.nl (que sí lo permite). No baja el PDF.
+  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
   return g;
 }
 
@@ -1485,7 +1619,9 @@ function makeMagazineMesh2(drawCover, coverUrl) {
   body.material[1] = new THREE.MeshStandardMaterial({ color: 0x1d2b45, roughness: 0.5 }); // lomo
   body.position.y = T / 2; g.add(body);
   g.userData.coverMat = coverMat;
-  if (coverUrl) new THREE.TextureLoader().load(coverUrl, (t) => { coverMat.map = t; coverMat.needsUpdate = true; });
+  // la tapa de archive.org es una imagen de la primera página; su servidor no deja usarla como textura,
+  // así que si falla directo se pide a través de wsrv.nl (que sí lo permite). No baja el PDF.
+  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
   return g;
 }
 function drawMagCover(name, year) {
@@ -1718,7 +1854,7 @@ function loadImageTex(urls) {
     tryAt(0);
   });
 }
-const viaProxy = (u) => 'https://wsrv.nl/?w=1024&h=1024&fit=inside&url=' + encodeURIComponent(u.replace(/^https?:\/\//, ''));
+function viaProxy(u) { return 'https://wsrv.nl/?w=1024&h=1024&fit=inside&url=' + encodeURIComponent(u.replace(/^https?:\/\//, '')); }
 async function imageUrls(src) {
   if (!isArchive(src)) return /^https?:/i.test(src) ? [src, viaProxy(src)] : [src];
   const id = AO_RE.exec(src)[1], out = [];
@@ -1909,14 +2045,58 @@ function spawnFromCrate(it, id, k) {
   if (!SALV.spawned.includes(id)) SALV.spawned.push(id);
   const off = new THREE.Vector3((k % 3 - 1) * 0.18, 0.25 + Math.floor(k / 3) * 0.1, (k % 2 ? 0.08 : -0.08)).applyQuaternion(it.g.quaternion);
   n.g.position.copy(it.g.position).add(off);
+  n.fromCrate = it.id; n.noCollideUntil = performance.now() + 2500;
   n.vel.set((Math.random() - 0.5) * 0.15, 0.12 + Math.random() * 0.1, (Math.random() - 0.5) * 0.15);
   n.spin.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
   saveItems();
 }
+// saqueo: con la opción prendida, al abrir una cápsula se elige qué sacar; lo demás queda adentro
+let lootPick = store.get('orbita.lootPick', true);
+const LOOT = { cid: null };
+const KIND_NAME = { juego: 'game', programa: 'program', revista: 'magazine', video: 'video', musica: 'music', decoracion: 'decoration', disco: 'floppy', objeto: 'object' };
+const lootId = (id) => (/^box:/.test(id) ? 'disk:' + id.slice(4) : id);
+function lootLeft(cid) {
+  const c = SALV.crates[cid];
+  return c ? c.ids.map((id, k) => [lootId(id), k]).filter(([id]) => !SALV.spawned.includes(id) && !itemById(id) && CATALOG.get(id)) : [];
+}
+function renderLoot() {
+  const c = SALV.crates[LOOT.cid], ul = $('lootList');
+  if (!c) return;
+  $('lootTitle').textContent = 'Capsule ' + satName(c.year) + ' (' + c.year + ')';
+  ul.textContent = '';
+  const left = lootLeft(LOOT.cid);
+  left.forEach(([id, k]) => {
+    const e = CATALOG.get(id), li = document.createElement('li'), sp = document.createElement('span'), b = document.createElement('button');
+    sp.textContent = e.name || id; sp.title = e.name || id;
+    const sm = document.createElement('small'); sm.textContent = ' · ' + (KIND_NAME[e.kind] || 'thing'); sp.appendChild(sm);
+    b.type = 'button'; b.textContent = 'Take';
+    b.addEventListener('click', () => { lootTake(id, k); });
+    li.append(sp, b); ul.appendChild(li);
+  });
+  if (!left.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = c.pending ? 'Things are still coming loose from the wreckage…' : 'Nothing left. The empty capsule can be ejected through the airlock.'; ul.appendChild(li); }
+  $('lootAll').disabled = !left.length;
+}
+function lootTake(id, k) {
+  const it = itemById(LOOT.cid);
+  if (!it) return;
+  spawnFromCrate(it, id, k); click();
+  saveSalv(); renderLoot();
+}
+function openLoot(it) {
+  LOOT.cid = it.id;
+  openComfort('loot'); renderLoot();
+}
+$('lootAll').addEventListener('click', () => { lootLeft(LOOT.cid).forEach(([id, k]) => lootTake(id, k)); });
+$('lootClose').addEventListener('click', closeComfort);
 function openCrate(it) {
-  if (it.opened) return;
+  if (it.opened) { if (lootPick) openLoot(it); return; }
   it.opened = true; it.lidT = 0.001;
   click(); paperSound();
+  if (lootPick) {
+    if (it.g.userData.glow) it.g.userData.glow.emissive.setHex(0x46b6ff);
+    saveItems(); openLoot(it);
+    return;
+  }
   const c = SALV.crates[it.id];
   const ids = c ? c.ids : [];
   ids.forEach((id, k) => spawnFromCrate(it, id, k));
@@ -2100,7 +2280,8 @@ const AO_Q = {
   programas: 'collection:softwarelibrary_msdos',
   revistas: 'mediatype:texts AND (collection:magazine_rack OR collection:computermagazines OR collection:pulpmagazinearchive OR collection:magazines)',
   musica: 'mediatype:audio AND (collection:netlabels OR collection:audio_music OR collection:album_recordings OR collection:cassettetapes OR collection:tapes OR subject:album OR subject:cassette OR subject:LP)',
-  decoracion: 'mediatype:image AND (subject:poster OR subject:postcard OR subject:photograph OR collection:flickrcommons)'
+  decoracion: 'mediatype:image AND (subject:poster OR subject:postcard OR subject:photograph OR collection:flickrcommons)',
+  carteles: 'mediatype:image AND (subject:"movie poster" OR subject:"movie posters" OR subject:"film poster" OR subject:"film posters" OR subject:"video game poster" OR subject:"video game posters" OR subject:"video game advertisement" OR subject:"arcade flyer" OR subject:"arcade flyers")'
 };
 // cuánto pesa cada tipo al llenar una cápsula
 // el software al azar no se lee bien directo de archive.org: llega por el espejo de GitHub (herramientas/espejo.py)
@@ -2156,10 +2337,15 @@ const randomYear = () => { const [a, b] = FRANJAS[navAt()]; return a + Math.floo
 // suma a la cápsula cosas al azar de archive.org de su año; si ya está abierta, salen flotando
 // decoración: Wikimedia Commons deja leer sus imágenes desde cualquier página y las ordena por año
 const COMMONS_PAIS = { ar: 'Argentina', uy: 'Uruguay', cl: 'Chile', py: 'Paraguay', bo: 'Bolivia', pe: 'Peru', co: 'Colombia', ve: 'Venezuela', mx: 'Mexico', cu: 'Cuba', es: 'Spain', br: 'Brazil', pt: 'Portugal', us: 'the United States', ca: 'Canada', gb: 'the United Kingdom', ie: 'Ireland', au: 'Australia', fr: 'France', it: 'Italy', de: 'Germany', nl: 'the Netherlands', se: 'Sweden', pl: 'Poland', ru: 'Russia', jp: 'Japan', in: 'India' };
-async function commonsDecor(year) {
+// carteles: pósters de películas y de videojuegos de ese año (primero esos, después lo demás)
+async function commonsDecor(year, carteles) {
   const pais = COMMONS_PAIS[AO_RANDOM.pais];
-  const qs = [pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`].filter(Boolean);
-  for (const q of qs.sort(() => Math.random() - 0.5)) {
+  const shuffle = (a) => a.filter(Boolean).sort(() => Math.random() - 0.5);
+  const qs = carteles
+    ? [...shuffle([`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`]), ...shuffle([`incategory:"${year} video games" poster`, `"video game" advertisement ${year}`, `"arcade flyer" ${year}`])]
+    : shuffle([pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`]);
+  if (carteles) { const k = Math.random() < 0.5 ? 0 : 3; qs.unshift(...qs.splice(k, 3)); }
+  for (const q of qs) {
     const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
       + encodeURIComponent('filetype:bitmap ' + q) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
     const r = await fetch(url); if (!r.ok) throw new Error(r.status);
@@ -2202,7 +2388,8 @@ async function fillRandom(cid, count, best) {
   if (!c) return;
   c.pending = count; saveSalv();
   const rest = AO_MIX.filter((k) => k !== 'decoracion').sort(() => Math.random() - 0.5);
-  const order = ['decoracion', ...new Set(rest), 'decoracion', ...rest];
+  // casi siempre llega un póster de una película o de un videojuego de ese año
+  const order = ['carteles', 'decoracion', ...new Set(rest), 'carteles', ...rest];
   let got = 0, fails = 0;
   const add = (e) => {
     const id = linkId(e);
@@ -2210,22 +2397,25 @@ async function fillRandom(cid, count, best) {
     SALV.aoEntries.push(e); c.ids.push(id); if (!SALV.got.includes(id)) SALV.got.push(id);
     got++; c.pending = count - got; saveSalv();
     const it = itemById(cid);
-    if (it && it.opened) spawnFromCrate(it, id, c.ids.length - 1);
+    if (it && it.opened && !lootPick) spawnFromCrate(it, id, c.ids.length - 1);
+    if (state === 'panel' && panelName === 'loot' && LOOT.cid === cid) renderLoot();
     return true;
   };
   for (let k = 0; k < order.length && got < count && fails < 4; k++) {
     const cat = order[k];
     let e = null;
-    if (cat === 'decoracion') { try { e = await commonsDecor(c.year); } catch (err) { fails++; } }
+    if (cat === 'decoracion' || cat === 'carteles') { try { e = await commonsDecor(c.year, cat === 'carteles'); } catch (err) { fails++; } }
     if (!e) { try { e = await aoRandomItem(c.year, cat, best); } catch (err) { fails++; continue; } }
+    if (e && e.cat === 'carteles') e.cat = 'decoracion';
     if (e) add(e);
   }
   if (!c.ids.some((id) => /^(deco|gen):/.test(id))) {
     // ni la red ni la carpeta trajeron decoración: llega una postal del satélite
     const id = genDecor(c.year); c.ids.push(id); SALV.got.push(id);
-    const it = itemById(cid); if (it && it.opened) spawnFromCrate(it, id, c.ids.length - 1);
+    const it = itemById(cid); if (it && it.opened && !lootPick) spawnFromCrate(it, id, c.ids.length - 1);
   }
   c.pending = 0; saveSalv();
+  if (state === 'panel' && panelName === 'loot' && LOOT.cid === cid) renderLoot();
   if (fails >= 4 && !AO_RANDOM.offlineWarned) { AO_RANDOM.offlineWarned = true; toast('I couldn\'t reach archive.org or Wikimedia: this capsule came with whatever was at hand.', 8000); }
 }
 
@@ -4314,6 +4504,7 @@ function setUI() {
   $('readerUI').hidden = !(state === 'panel' && panelName === 'reader');
   $('musicUI').hidden = !(state === 'panel' && panelName === 'music');
   $('navUI').hidden = !(state === 'panel' && panelName === 'nav');
+  $('lootUI').hidden = !(state === 'panel' && panelName === 'loot');
   if (state !== 'walk') hint.hidden = true;
   if (state === 'paused') {
     veil.hidden = false; veil.classList.add('clear');
@@ -4429,6 +4620,8 @@ $('lClose').addEventListener('click', closeComfort);
   sel.addEventListener('change', () => { AO_RANDOM.pais = sel.value; store.set('orbita.pais', sel.value); });
   const sh = $('showHints'); sh.checked = showHints;
   sh.addEventListener('change', () => { showHints = sh.checked; store.set('orbita.hints', showHints); });
+  const lp = $('lootPick'); lp.checked = lootPick;
+  lp.addEventListener('change', () => { lootPick = lp.checked; store.set('orbita.lootPick', lootPick); });
   const cb = $('aoRandom'); cb.checked = AO_RANDOM.on;
   cb.addEventListener('change', () => { AO_RANDOM.on = cb.checked; store.set('orbita.aoRandom', cb.checked); });
 }
@@ -4536,7 +4729,7 @@ async function importGame(file, data = null) {
 $('saveFile').addEventListener('click', exportGame);
 $('loadFile').addEventListener('click', () => $('loadInput').click());
 // limpiar satélite: borra la partida de este navegador y deja el módulo como al principio (se quedan las preferencias)
-const KEEP_PREFS = ['orbita.pais', 'orbita.aoRandom', 'orbita.hints', 'orbita.comfort', 'orbita.screen3d', 'orbita.tone1', 'orbita.tone2', 'orbita.musicVol', 'orbita.muted'];
+const KEEP_PREFS = ['orbita.pais', 'orbita.aoRandom', 'orbita.hints', 'orbita.comfort', 'orbita.screen3d', 'orbita.tone1', 'orbita.tone2', 'orbita.musicVol', 'orbita.muted', 'orbita.lootPick'];
 async function cleanSatellite() {
   const msg = $('progress');
   if (!confirm('Cleaning the satellite erases the game in this browser: the salvage, the objects, the floppies and whatever you saved on the computers. The pod goes back to how it was at the start. Continue?')) return;
@@ -4588,9 +4781,10 @@ document.addEventListener('pointerlockchange', () => {
 
 let lastGrab = { at: 0, it: null };
 function walkClick(e) {
+  if (performance.now() < noAimUntil) return;
   if (PROJ.moving) { dropScreen(); return; }
   // doble clic sobre una cápsula (o una caja vieja) la abre
-  if (held.it && held.it === lastGrab.it && performance.now() - lastGrab.at < 450 && (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened) {
+  if (held.it && held.it === lastGrab.it && performance.now() - lastGrab.at < 450 && (held.it.kind === 'crate' || held.it.kind === 'gamebox') && (!held.it.opened || (held.it.kind === 'crate' && lootPick))) {
     const it = held.it; releaseItem(); lastGrab.it = null;
     if (it.kind === 'crate') openCrate(it); else openGameBox(it);
     return;
@@ -4836,7 +5030,12 @@ document.addEventListener('mousedown', (e) => {
 document.addEventListener('mouseup', (e) => { if (e.button === 2) held.rotating = false; });
 document.addEventListener('mousedown', (e) => {
   if (e.button !== 1 || state !== 'walk' || !locked() || !held.it || PROJ.moving) return;
-  e.preventDefault(); throwHeld();
+  e.preventDefault(); CHARGE.at = performance.now();
+});
+document.addEventListener('mouseup', (e) => {
+  if (e.button !== 1 || !CHARGE.at) return;
+  e.preventDefault();
+  if (state === 'walk' && held.it) throwHeld(chargeK()); else CHARGE.at = 0;
 });
 document.addEventListener('contextmenu', (e) => { if (state === 'walk' || state === 'terminal') e.preventDefault(); });
 renderer.domElement.addEventListener('touchstart', (e) => {
@@ -4900,6 +5099,8 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyF') walkClick();
     if (e.code === 'KeyL') toggleCeiling();
     if (e.code === 'KeyP') deckAction('play');
+    if (e.code === 'KeyX' && state === 'walk') discardItem();
+    if (e.code === 'KeyZ' && state === 'walk') undoDiscard();
     if (e.key && e.key.length === 1) cheatKey(e.key);
     if (e.code === 'KeyR' && state === 'walk') { const m = held.it && held.it.kind === 'magazine' ? held.it : aimed && aimed.item && aimed.item.kind === 'magazine' ? aimed.item : null; if (m) { if (held.it) releaseItem(); openReader(m); } }
   }
@@ -5017,19 +5218,20 @@ function frame() {
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
     const hit = raycaster.intersectObjects(targetMeshes.concat(itemMeshes), false).find((h) => { const it = itemByMesh.get(h.object); return !it || (!it.gone && !it.held && it.g.visible); });
     aimed = null;
-    if (hit && hit.distance < 2.6) {
+    if (hit && hit.distance < 2.6 && performance.now() >= noAimUntil) {
       const it = itemByMesh.get(hit.object);
       aimed = it ? { item: it, dist: hit.distance } : { target: targetOf.get(hit.object), dist: hit.distance };
     }
     if (held.it) aimStick(); else stickAim.ok = false;
     let label = null;
-    if (PROJ.moving) label = 'leave the screen here';
+    if (CHARGE.at && held.it) { const k = chargeK(); label = 'throw strength ' + '▮'.repeat(Math.round(k * 10)) + '▯'.repeat(10 - Math.round(k * 10)) + ' · release the middle button'; }
+    else if (PROJ.moving) label = 'leave the screen here';
     else if (stickWins()) label = 'pegar ' + held.it.label + ' (velcro)' + (isTouch ? '' : ' · Shift+click: drop · middle button: throw');
     else if (aimed && aimed.target) label = aimed.target.label();
-    else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && !aimed.item.opened ? ' (double-click: open)' : aimed.item.kind === 'magazine' ? ' (R to read)' : '');
+    else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && (!aimed.item.opened || (aimed.item.kind === 'crate' && lootPick && lootLeft(aimed.item.id).length)) ? ' (double-click: open)' : aimed.item.kind === 'magazine' ? ' (R to read)' : '');
     else if (held.it) label = 'soltar ' + held.it.label + (held.it.kind === 'magazine' ? ' (R to read)' : (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened ? ' (double-click: open)' : '') + (isTouch ? '' : ' · middle button: throw');
-    hint.hidden = !label || !showHints;
-    if (label) hint.textContent = (isTouch ? 'Tap Use to ' : 'Click to ') + label;
+    hint.hidden = !label || (!showHints && !CHARGE.at);
+    if (label) hint.textContent = CHARGE.at ? label.charAt(0).toUpperCase() + label.slice(1) : (isTouch ? 'Tap Use to ' : 'Click to ') + label;
     useBtn.hidden = !(isTouch && label);
     if (held.it) held.target.copy(camera.position).addScaledVector(fwd, held.dist);
   } else if (state === 'tween' && tween) {
