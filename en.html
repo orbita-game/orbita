@@ -136,7 +136,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   <kbd>right button</kbd> + mouse turns what you hold · + scroll wheel tilts it<br>
   click the computer to use it · <kbd>Esc</kbd> get up<br>
   <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine · <kbd>L</kbd> lights · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
-  <kbd>X</kbd> discards what you hold or look at · <kbd>Z</kbd> brings it back<br>
+  <kbd>F</kbd> or right double-click opens a capsule · <kbd>X</kbd> discards what you hold or look at · <kbd>Z</kbd> brings it back<br>
   aim at a wall with something in hand to stick it with velcro · <kbd>Shift</kbd>+click drops it without sticking
 </div>
 <div class="hud" id="termHelp" hidden>
@@ -192,7 +192,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div id="lootUI" class="cpanel" hidden>
   <div class="cbox">
     <h2 id="lootTitle">Capsule</h2>
-    <p class="lnote">Pick what to take out. The rest stays in the capsule until you open it again (double click).</p>
+    <p class="lnote">Pick what to take out. The rest stays in the capsule until you open it again (F or right double-click).</p>
     <ol id="lootList" class="mlist"></ol>
     <div class="crow"><button id="lootAll" class="cbtn">Take everything</button><button id="lootClose" class="btn">Back (Esc)</button></div>
   </div>
@@ -254,6 +254,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <dt>Look</dt><dd>mouse (or drag your finger)</dd>
       <dt>Float</dt><dd>W A S D, Q up, E down</dd>
       <dt>Objects</dt><dd>click to grab and drop, middle button to throw</dd>
+      <dt>Capsules</dt><dd>F or right double-click opens them</dd>
       <dt>Program</dt><dd>click the computer</dd>
       <dt>Get up</dt><dd>Esc</dd>
       <dt>Time</dt><dd>T speeds up the orbit ×30</dd>
@@ -4811,15 +4812,18 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 let lastGrab = { at: 0, it: null };
+// abrir una cápsula (o una caja vieja): con F o doble clic derecho, sobre la que tenés o la que mirás
+const canOpen = (it) => it && (it.kind === 'crate' || it.kind === 'gamebox') && (!it.opened || (it.kind === 'crate' && lootPick));
+function openAimed() {
+  const it = canOpen(held.it) ? held.it : !held.it && aimed && canOpen(aimed.item) ? aimed.item : null;
+  if (!it) return false;
+  if (held.it === it) releaseItem();
+  if (it.kind === 'crate') openCrate(it); else openGameBox(it);
+  return true;
+}
 function walkClick(e) {
   if (performance.now() < noAimUntil) return;
   if (PROJ.moving) { dropScreen(); return; }
-  // doble clic sobre una cápsula (o una caja vieja) la abre
-  if (held.it && held.it === lastGrab.it && performance.now() - lastGrab.at < 450 && (held.it.kind === 'crate' || held.it.kind === 'gamebox') && (!held.it.opened || (held.it.kind === 'crate' && lootPick))) {
-    const it = held.it; releaseItem(); lastGrab.it = null;
-    if (it.kind === 'crate') openCrate(it); else openGameBox(it);
-    return;
-  }
   if (held.it) {
     // Shift+clic lo suelta aunque estés apuntando a una pared (sin velcro)
     if (!(e && e.shiftKey) && stickWins() && stickHeld()) return;
@@ -5053,8 +5057,11 @@ document.addEventListener('mousemove', (e) => {
   if (held.rotating && held.it) rotateHeld(e.movementX * 0.007, e.movementY * 0.007, 0);
   else look(e.movementX, e.movementY, 0.0022);
 });
+let lastRight = 0;
 document.addEventListener('mousedown', (e) => {
   if (e.button !== 2 || state !== 'walk' || !locked()) return;
+  const now = performance.now(), dbl = now - lastRight < 400; lastRight = now;
+  if (dbl && openAimed()) { held.rotating = false; lastRight = 0; return; }
   if (!held.it && aimed && aimed.item) grabItem(aimed.item, clamp(aimed.dist, 0.5, aimed.item.kind === 'crate' ? 1.1 : 0.8));
   if (held.it) held.rotating = true;
 });
@@ -5127,7 +5134,7 @@ window.addEventListener('keydown', (e) => {
       $('speedLine').textContent = timeScale === 0 ? 'Orbit stopped · T to resume' : 'Time sped up ×30';
     }
     if (e.code === 'KeyM') toggleMute();
-    if (e.code === 'KeyF') walkClick();
+    if (e.code === 'KeyF' && state === 'walk' && !openAimed()) walkClick();
     if (e.code === 'KeyL') toggleCeiling();
     if (e.code === 'KeyP') deckAction('play');
     if (e.code === 'KeyX' && state === 'walk') discardItem();
@@ -5259,8 +5266,8 @@ function frame() {
     else if (PROJ.moving) label = 'leave the screen here';
     else if (stickWins()) label = 'pegar ' + held.it.label + ' (velcro)' + (isTouch ? '' : ' · Shift+click: drop · middle button: throw');
     else if (aimed && aimed.target) label = aimed.target.label();
-    else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && (!aimed.item.opened || (aimed.item.kind === 'crate' && lootPick && lootLeft(aimed.item.id).length)) ? ' (double-click: open)' : aimed.item.kind === 'magazine' ? ' (R to read)' : '');
-    else if (held.it) label = 'soltar ' + held.it.label + (held.it.kind === 'magazine' ? ' (R to read)' : (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened ? ' (double-click: open)' : '') + (isTouch ? '' : ' · middle button: throw');
+    else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && (!aimed.item.opened || (aimed.item.kind === 'crate' && lootPick && lootLeft(aimed.item.id).length)) ? ' (F or right double-click: open)' : aimed.item.kind === 'magazine' ? ' (R to read)' : '');
+    else if (held.it) label = 'soltar ' + held.it.label + (held.it.kind === 'magazine' ? ' (R to read)' : canOpen(held.it) && (held.it.kind !== 'crate' || !held.it.opened || lootLeft(held.it.id).length) ? ' (F or right double-click: open)' : '') + (isTouch ? '' : ' · middle button: throw');
     hint.hidden = !label || (!showHints && !CHARGE.at);
     if (label) hint.textContent = CHARGE.at ? label.charAt(0).toUpperCase() + label.slice(1) : (isTouch ? 'Tap Use to ' : 'Click to ') + label;
     useBtn.hidden = !(isTouch && label);
