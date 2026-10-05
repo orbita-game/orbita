@@ -1,0 +1,23 @@
+c64/ - Commodore 64 emulator module for Orbita
+==============================================
+
+This directory contains NO original Commodore ROMs (KERNAL/BASIC/CHARGEN),
+no cartridges and no third-party games or programs.
+
+c64.js     Glue code (written for Orbita).
+c64.wasm   Built from floooh/chips (https://github.com/floooh/chips,
+           commit 9e88298ce56319953ac7a43213a1120359f7a3a6, headers unmodified)
+           plus a small wrapper (wrapper.c, libc.c). Built with clang + wasm-ld,
+           Sources + build script are kept with the game sources (c64 src/,
+           build.sh). Contains no ROM data.
+           chips: Copyright (c) 2018 Andre Weissflog, zlib/libpng license
+           -> licenses/chips-zlib-LICENSE.txt
+
+roms/      MEGA65 Open ROMs, prebuilt "generic" C64 set, release DEV.210823.FC.1
+           https://github.com/MEGA65/open-roms
+           commit ad178dbe4d48cd6a317737a8e0e7e662f7e33d32, files bin/kernal_generic.rom,
+           bin/basic_generic.rom, bin/chargen_openroms.rom (unmodified, see roms/SHA256SUMS)
+           Copyright Paul Gardner-Stephen 2019, Roman Standzikowski (FeralChild64) 2019-2021,
+           LGPL-3.0-or-later (some BASIC parts MIT, Copyright (c) Microsoft Corporation)
+           -> licenses/open-roms-LICENSE.txt, licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
+           Corresponding source: https://github.com/MEGA65/open-roms/tree/ad178dbe4d48cd6a317737a8e0e7e662f7e33d32

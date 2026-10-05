@@ -162,6 +162,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div id="screenUI" class="cpanel" hidden>
   <div class="cbox">
     <h2>Pantalla</h2>
+    <p class="lnote">Las cintas no se meten en ningún aparato: los captadores las escanean al recogerlas y lo que tienen pasa a la memoria del módulo.</p>
     <label for="cTape">Cinta VHS</label><select id="cTape"></select>
     <div class="crow"><button id="sBack" class="cbtn" title="Rebobinar 10 segundos">⏪ 10 s</button><button id="sPause" class="cbtn">▶ Reproducir</button><button id="sFwd" class="cbtn" title="Adelantar 30 segundos">30 s ⏩</button><button id="cPlay" class="cbtn">Reproducir</button></div>
     <input id="sPos" type="range" min="0" max="1000" value="0" aria-label="Posición del video"><span id="sTime" class="lnote">detenido</span>
@@ -181,6 +182,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div id="musicUI" class="cpanel" hidden>
   <div class="cbox">
     <h2>Música</h2>
+    <p class="lnote">Los discos y casetes llegan escaneados: los captadores copian lo que tienen al recogerlos.</p>
     <p id="mNow" class="lnote">-</p>
     <div class="crow"><button id="mPrevT" class="cbtn" title="Tema anterior">⏮ tema</button><button id="mPlay" class="cbtn">▶ Reproducir</button><button id="mNextT" class="cbtn" title="Tema siguiente">tema ⏭</button></div>
     <label for="mVol">Volumen</label><input id="mVol" type="range" min="0" max="100">
@@ -195,6 +197,14 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     <p class="lnote">Elegí qué sacar. Lo demás queda guardado en la cápsula hasta que vuelvas a abrirla (F o doble clic derecho).</p>
     <ol id="lootList" class="mlist"></ol>
     <div class="crow"><button id="lootAll" class="cbtn">Sacar todo</button><button id="lootClose" class="btn">Volver (Esc)</button></div>
+  </div>
+</div>
+<div id="diskUI" class="cpanel" hidden>
+  <div class="cbox">
+    <h2>Disquetes</h2>
+    <p class="lnote">Uno virgen para copiarle cosas desde el DOS, o uno grabado con un zip de tu computadora (un juego o programa de DOS).</p>
+    <div class="crow"><button id="dBlank" class="cbtn">Sacar uno virgen</button><button id="dZip" class="cbtn">Grabar un zip de tu computadora</button></div>
+    <button id="dClose" class="btn">Volver (Esc)</button>
   </div>
 </div>
 <div id="navUI" class="cpanel" hidden>
@@ -437,6 +447,7 @@ window.addEventListener('resize', () => {
 });
 
 /* estrellas */
+let starField;
 {
   const n = 2600, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -448,7 +459,8 @@ window.addEventListener('resize', () => {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true })));
+  starField = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true }));
+  scene.add(starField);
 }
 
 /* sol */
@@ -618,7 +630,7 @@ function box(w, h, d, mat, x, y, z, shadow = true, parent = scene) {
 /* casco octogonal a lo largo de z. Apotema 2.2, piso en y=0, centro en y=2.2. Caras: 0 piso, 1 abajo-der, 2 der, 3 arriba-der, 4 techo, 5 arriba-izq, 6 izq, 7 abajo-izq */
 const POD = { A: 2.2, C: 2.2, z0: -4.5, z1: 4.5 };
 POD.S = 2 * POD.A * Math.tan(Math.PI / 8);
-const WINDOWS = new Set(['7:1', '7:3', '7:5', '6:1', '6:3', '6:5', '5:3', '3:6']);
+const WINDOWS = new Set(['7:1', '7:3', '7:5', '6:1', '6:3', '6:5', '5:3', '3:6', '2:0', '2:4']);
 // una fila de paneles vidriados en el piso, con su propio control de opacidad
 const FLOOR_WINDOWS = new Set(['0:1', '0:3', '0:5', '0:7']);
 function faceFrame(i) {
@@ -752,7 +764,7 @@ box(2.2 - CON.x0 + 0.3, 0.78, CON.z1 - CON.z0, matConsole, (CON.x0 + 2.5) / 2, 0
 box(2.2 - CON.x0 + 0.3, 0.04, CON.z1 - CON.z0 + 0.02, matDesk, (CON.x0 + 2.5) / 2 - 0.02, 0.8, (CON.z0 + CON.z1) / 2);
 const DESK_TOP = 0.82;
 box(0.02, 0.02, CON.z1 - CON.z0, matGlow, CON.x0 - 0.03, 0.78, (CON.z0 + CON.z1) / 2, false);
-const housing = box(1.2, 1.25, 1.5, matConsole, 1.25 + 0.6, DESK_TOP + 0.625, -1.9);
+const housing = box(1.2, 0.26, 1.5, matConsole, 1.25 + 0.6, DESK_TOP + 0.13, -1.9); // base donde apoya la computadora
 // pantalla CRT embutida
 const TW = 768, TH = 576;
 const termCanvas = document.createElement('canvas'); termCanvas.width = TW; termCanvas.height = TH;
@@ -763,9 +775,8 @@ const SCREEN_C = new THREE.Vector3(1.243, 1.47, -1.9);
 const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.375), new THREE.MeshBasicMaterial({ map: termTex }));
 screen.position.copy(SCREEN_C); screen.rotation.y = -Math.PI / 2;
 scene.add(screen);
-[[0, 0.215, 0.6, 0.05], [0, -0.215, 0.6, 0.05], [0.275, 0, 0.05, 0.48], [-0.275, 0, 0.05, 0.48]].forEach(([dz, dy, wz, hy]) => {
-  box(0.05, hy, wz, matFrame, 1.235, SCREEN_C.y + dy, SCREEN_C.z + dz);
-});
+const FRAMES1 = [[0, 0.215, 0.6, 0.05], [0, -0.215, 0.6, 0.05], [0.275, 0, 0.05, 0.48], [-0.275, 0, 0.05, 0.48]].map(([dz, dy, wz, hy]) =>
+  box(0.05, hy, wz, matFrame, 1.235, SCREEN_C.y + dy, SCREEN_C.z + dz));
 const screenGlow = new THREE.PointLight(0xffa640, 0.35, 1.8, 2);
 screenGlow.position.set(0.95, 1.45, -1.9);
 scene.add(screenGlow);
@@ -1135,7 +1146,7 @@ const PAGES = [
     'Clic en la hoja derecha: pasa la página. Clic en la izquierda: vuelve. Arrastrala para moverla, la ruedita la gira y doble clic la levanta para leer.',
     '',
     '2  Primeros pasos', '3  Mostrar y preguntar', '4  Decisiones y saltos', '5  Repetir',
-    '6  Números', '7  Texto', '8  Extras de la estación', '9  Disquetes y unidades'] },
+    '6  Números', '7  Texto', '8  Extras de la estación', '9  Pantalla, teclado y listas', '10 Disquetes y unidades'] },
   { title: 'Primeros pasos', body: [
     'En DOS escribí BASIC para entrar. Cada línea que empieza con un número queda guardada en el programa:',
     '> 10 PRINT "HOLA"', '> 20 GOTO 10',
@@ -1177,6 +1188,12 @@ const PAGES = [
     'PAUSA N espera N segundos. Sirve para mirar por la ventana mientras corre algo.',
     'BEEP hace sonar el parlante.', 'TIMER da los segundos que pasaron desde que llegaste.',
     '> 10 PRINT "T MENOS"; 3', '> 20 PAUSA 1', '> 30 BEEP'] },
+  { title: 'Pantalla, teclado y listas', body: [
+    'LOCATE F, C escribe en la fila F y la columna C sin correr la pantalla. BEEP 440, 0.2 suena a 440 Hz durante 0,2 segundos.',
+    'INKEY$ da la tecla apretada sin esperar ("" si no hay ninguna). Las flechas llegan como "ARRIBA", "ABAJO", "IZQUIERDA" y "DERECHA".',
+    'DIM A(20) arma una lista; DIM M(9, 15) una tabla:',
+    '> 10 K$ = INKEY$ : IF K$ = "" THEN 10', '> 20 LOCATE 5, 10 : PRINT K$',
+    'BLOQUES y MONOS, en C:, están hechos así.'] },
   { title: 'Disquetes y unidades', body: [
     'C: es el disco rígido de la estación. A: es la disquetera, a la izquierda de la pantalla.',
     'Clic en un disquete del escritorio para ponerlo en A:. Clic en la disquetera para sacarlo.',
@@ -1210,7 +1227,7 @@ function drawPage(i) {
   const serif = '"Courier Prime", "Courier New", monospace';
   if (p.cover) {
     x.fillStyle = '#1d2b45'; x.fillRect(36, 60, PW - 72, 8); x.fillRect(36, PH - 120, PW - 72, 4);
-    x.font = `700 64px ${serif}`; x.fillText('GW-BASIC', 44, 180);
+    x.font = `700 64px ${serif}`; x.fillText('BASIC', 44, 180);
     x.font = `400 28px ${serif}`; x.fillText('Manual del operador', 46, 230);
     x.font = `400 22px ${serif}`; x.fillStyle = '#5a4a36'; x.fillText('Estación Órbita · 1986', 46, PH - 80);
     x.save(); x.translate(PW - 150, PH - 250); x.rotate(-0.25);
@@ -1325,6 +1342,20 @@ const deckButtons = {};
 [['prev', -0.27], ['play', -0.09], ['next', 0.09], ['load', 0.27]].forEach(([id, dz]) => {
   const b = box(0.03, 0.045, 0.13, new THREE.MeshStandardMaterial({ color: id === 'play' ? 0xc8662a : 0x8a929c, roughness: 0.5, metalness: 0.3 }), DECK.x - 0.03, DECK.y - 0.155, DECK.z + dz, false);
   b.userData.deck = id; deckButtons[id] = b;
+});
+/* ---------- video de a bordo (al lado de la casetera): muestra qué pasa la pantalla ---------- */
+const VCR = { x: 1.5, y: 1.02, z: 0.25, w: 0.66, h: 0.26, sig: '' };
+const vcrBody = box(0.75, VCR.h + 0.08, VCR.w + 0.1, matConsole, VCR.x + 0.36, VCR.y, VCR.z);
+box(0.7, 0.04, VCR.w + 0.2, matDesk, VCR.x + 0.3, VCR.y - VCR.h / 2 - 0.06, VCR.z);
+const vcrCanvas = document.createElement('canvas'); vcrCanvas.width = 640; vcrCanvas.height = Math.round(640 * VCR.h / VCR.w);
+const vcrTex = new THREE.CanvasTexture(vcrCanvas); vcrTex.anisotropy = 4;
+const vcrFace = new THREE.Mesh(new THREE.PlaneGeometry(VCR.w, VCR.h), new THREE.MeshStandardMaterial({ map: vcrTex, roughness: 0.6, emissive: 0xffffff, emissiveMap: vcrTex, emissiveIntensity: 0.35 }));
+vcrFace.position.set(VCR.x - 0.022, VCR.y, VCR.z); vcrFace.rotation.y = -Math.PI / 2; scene.add(vcrFace);
+const VCR_BTN = [['prev', -0.21], ['play', -0.07], ['stop', 0.07], ['next', 0.21]];
+const vcrButtons = {};
+VCR_BTN.forEach(([id, dz]) => {
+  const b = box(0.03, 0.04, 0.11, new THREE.MeshStandardMaterial({ color: id === 'play' ? 0xc8662a : 0x8a929c, roughness: 0.5, metalness: 0.3 }), VCR.x - 0.03, VCR.y - VCR.h / 2 + 0.035, VCR.z + dz, false);
+  vcrButtons[id] = b;
 });
 
 /* ---------- envíos: caja y contenido ---------- */
@@ -1537,8 +1568,9 @@ let structMeshes = [];
 function collectStruct() {
   structMeshes = [];
   scene.traverse((m) => {
-    if (!m.isMesh || itemByMesh.has(m) || m === projScreen || m.material === glassMat) return;
-    let p = m; while (p) { if (p === earthPivot || p === screenRoll) return; p = p.parent; }
+    if (m.userData.stickGlass) { structMeshes.push(m); return; }
+    if (!m.isMesh || itemByMesh.has(m) || m === projScreen || m.material === glassMat || DEBRIS.meshes.includes(m)) return;
+    let p = m; while (p) { if (p === earthPivot || p === screenRoll || p === sky) return; p = p.parent; }
     if (m.material && m.material.transparent) return;
     structMeshes.push(m);
   });
@@ -2649,6 +2681,7 @@ const floorGlassMat = glassMat.clone();
   gl.position.set(nx * (POD.A + 0.06), POD.C + ny * (POD.A + 0.06), POD.z0 + sgi + 0.5);
   gl.rotation.set(Math.PI / 2, 0, th, 'ZXY');
   gl.rotation.order = 'ZXY';
+  gl.userData.stickGlass = true; // en los vidrios de las ventanas también se puede pegar
   scene.add(gl);
 });
 {
@@ -2799,6 +2832,8 @@ function setScreenVol(v) {
   const m = screenMedia(); if (m) m.volume = muted ? 0 : PROJ.vol;
 }
 const embedMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+// con el video montado, la tela deja ver la capa web de atrás: así lo que está delante de la pantalla la tapa
+const embedHoleMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide });
 const EMBED = { obj: null, el: null, css: null, W: 960 };
 async function ensureCss3d() {
   if (EMBED.css) return;
@@ -2806,7 +2841,7 @@ async function ensureCss3d() {
   const css = new THREE.CSS3DRenderer();
   css.setSize(window.innerWidth, window.innerHeight);
   Object.assign(css.domElement.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
-  $('stage').appendChild(css.domElement);
+  $('stage').insertBefore(css.domElement, renderer.domElement); // detrás del lienzo, como los pósters de HOLE
   window.addEventListener('resize', () => css.setSize(window.innerWidth, window.innerHeight));
   EMBED.css = css;
 }
@@ -2820,6 +2855,7 @@ async function playEmbed(tape) {
     const obj = new THREE.CSS3DObject(el);
     screenRoll.add(obj);
     EMBED.obj = obj; EMBED.el = el;
+    if (VHS.playing) projScreen.material = embedHoleMat;
   };
   const iframe = () => {
     // respaldo: el reproductor de archive.org (no deja cambiar el volumen ni adelantar desde el juego)
@@ -2924,7 +2960,7 @@ function updateEmbed() {
   if (!EMBED.obj) return;
   EMBED.obj.position.set(0, -PROJ.h / 2, 0.012);
   EMBED.obj.scale.setScalar((PROJ.hw * 2) / EMBED.W);
-  // se ve solo de frente y con la pantalla baja (la capa web va por encima del mundo 3D)
+  // se ve solo de frente y con la pantalla baja (la capa web va detrás del mundo 3D y asoma por la tela)
   screenRoll.getWorldPosition(_ep); _en.set(0, 0, 1).applyQuaternion(screenRoll.quaternion);
   EMBED.obj.visible = PROJ.t > 0.95 && state !== 'menu' && camera.position.clone().sub(_ep).dot(_en) > 0.2;
   EMBED.css.render(scene, camera);
@@ -2936,6 +2972,7 @@ function vhsStop(quiet) {
 }
 function updateProjector(dt) {
   if (PROJ.moving) placeScreenAtView();
+  if (MAC.moving) placeMacAtView();
   PROJ.t += ((PROJ.down ? 1 : 0) - PROJ.t) * Math.min(1, dt * 1.6);
   if (Math.abs(PROJ.t - (PROJ.down ? 1 : 0)) < 0.002) PROJ.t = PROJ.down ? 1 : 0;
   projScreen.scale.y = Math.max(0.001, PROJ.t * PROJ.sy);
@@ -2964,8 +3001,8 @@ scene.add(backFill);
 
 /* interruptor de luces y lámpara */
 const lights = { ceiling: store.get('orbita.ceiling', true), lamp: store.get('orbita.lamp', true) };
-const switchPlate = box(0.02, 0.15, 0.1, matFrame, 2.185, 1.55, -0.4, false);
-const switchNub = box(0.03, 0.05, 0.03, matOrange, 2.17, 1.55, -0.4, false);
+const switchPlate = box(0.02, 0.15, 0.1, matFrame, 2.185, 1.55, -0.56, false);
+const switchNub = box(0.03, 0.05, 0.03, matOrange, 2.17, 1.55, -0.56, false);
 function toggleCeiling() { lights.ceiling = !lights.ceiling; store.set('orbita.ceiling', lights.ceiling); applyLights(); click(); }
 function toggleLamp() { lights.lamp = !lights.lamp; store.set('orbita.lamp', lights.lamp); applyLights(); click(); }
 
@@ -2979,6 +3016,75 @@ const THETA0 = 1.0;
 const toEarth = EARTH_C.clone().normalize();
 const umbra = Math.asin(EARTH_R / EARTH_C.length());
 let sunVisible = 1;
+
+/* cielo: estrellas, Luna y planetas giran juntos, una vuelta por órbita (el módulo siempre mira a la Tierra) */
+const ORBIT_N = new THREE.Vector3().crossVectors(U, Wv).normalize();
+const sky = new THREE.Group();
+scene.add(sky);
+sky.add(starField);
+function skyDir(deg, tilt) { // ángulo desde el Sol en el plano de la órbita, y cuánto se aparta de ese plano
+  const sun0 = U.clone().multiplyScalar(Math.cos(THETA0)).addScaledVector(Wv, Math.sin(THETA0));
+  return sun0.applyAxisAngle(ORBIT_N, THREE.MathUtils.degToRad(deg))
+    .addScaledVector(ORBIT_N, Math.tan(THREE.MathUtils.degToRad(tilt))).normalize();
+}
+const moon = (() => {
+  // textura inventada: mares oscuros sobre todo en la cara que mira hacia acá, y cráteres
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const x = c.getContext('2d'), rnd = mulberry(1969);
+  x.fillStyle = '#b9b6ae'; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,250' : '60,58,55'},${0.03 + rnd() * 0.05})`; x.fillRect(rnd() * 512, rnd() * 256, 2 + rnd() * 10, 2 + rnd() * 10); }
+  const maria = [[120, 80, 34], [150, 110, 26], [95, 120, 30], [140, 150, 22], [70, 95, 20], [165, 75, 18], [110, 160, 16], [190, 125, 14], [330, 100, 10], [400, 140, 9]];
+  maria.forEach(([mx, my, r]) => {
+    for (let k = 0; k < 6; k++) {
+      const gx = mx + (rnd() - 0.5) * r, gy = my + (rnd() - 0.5) * r * 0.7, gr = r * (0.5 + rnd() * 0.6);
+      const g = x.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      g.addColorStop(0, 'rgba(70,72,74,0.55)'); g.addColorStop(0.7, 'rgba(80,80,80,0.35)'); g.addColorStop(1, 'rgba(90,90,90,0)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(gx, gy, gr, gr * 0.8, 0, 0, Math.PI * 2); x.fill();
+    }
+  });
+  for (let i = 0; i < 260; i++) {
+    const cx = rnd() * 512, cy = 20 + rnd() * 216, r = 1 + Math.pow(rnd(), 3) * 9;
+    x.strokeStyle = 'rgba(235,232,225,0.35)'; x.lineWidth = 1; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = 'rgba(60,58,55,0.18)'; x.beginPath(); x.arc(cx + r * 0.2, cy + r * 0.2, r * 0.8, 0, Math.PI * 2); x.fill();
+  }
+  // Tycho y sus rayos, para que se reconozca
+  x.strokeStyle = 'rgba(245,243,236,0.18)'; x.lineWidth = 1.5;
+  for (let k = 0; k < 14; k++) { const a = rnd() * Math.PI * 2; x.beginPath(); x.moveTo(125, 185); x.lineTo(125 + Math.cos(a) * 60, 185 + Math.sin(a) * 40); x.stroke(); }
+  x.fillStyle = '#f2efe6'; x.beginPath(); x.arc(125, 185, 3, 0, Math.PI * 2); x.fill();
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: tex }, sunDir: { value: sunDir } },
+    vertexShader: 'varying vec3 vN; varying vec2 vUv; void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform sampler2D map; uniform vec3 sunDir; varying vec3 vN; varying vec2 vUv; void main(){ float l = smoothstep(-0.02, 0.1, dot(normalize(vN), sunDir)); vec3 t = texture2D(map, vUv).rgb; gl_FragColor = vec4(t * (0.035 + 1.15 * l), 1.0); }'
+  });
+  // tamaño real en el cielo: medio grado (radio 3,86 a 850 m da 0,52°)
+  const m = new THREE.Mesh(new THREE.SphereGeometry(3.86, 48, 32), mat);
+  m.position.copy(skyDir(-100, -25)).multiplyScalar(850); // un poco más que cuarto creciente; al arrancar se ve por las ventanas de la derecha
+  m.lookAt(0, 0, 0); m.rotateY(-Math.PI / 2); m.rotateZ(0.25); // la cara con los mares mira hacia acá
+  sky.add(m);
+  return m;
+})();
+// planetas: a simple vista son puntos, sin disco; cada uno con su color y su brillo
+{
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const dot = new THREE.CanvasTexture(c);
+  [
+    // nombre, grados desde el Sol, apartado del plano, color, tamaño en píxeles
+    ['Venus', -38, 3, 0xfff6e0, 11],
+    ['Marte', 75, -2, 0xffa070, 6.5],
+    ['Júpiter', -150, 1.5, 0xfff0d0, 9],
+    ['Saturno', 130, 2.5, 0xf2dca0, 6.5]
+  ].forEach(([name, deg, tilt, color, px]) => {
+    const g2 = new THREE.BufferGeometry();
+    g2.setAttribute('position', new THREE.Float32BufferAttribute(skyDir(deg, tilt).multiplyScalar(880).toArray(), 3));
+    const pt = new THREE.Points(g2, new THREE.PointsMaterial({ map: dot, color, size: px, sizeAttenuation: false, transparent: true, depthWrite: false }));
+    pt.name = name;
+    sky.add(pt);
+  });
+}
 
 function updateOrbit() {
   const th = THETA0 + (simTime / ORBIT) * Math.PI * 2;
@@ -2994,6 +3100,7 @@ function updateOrbit() {
   earthshine.intensity = (0.12 + 0.8 * lit * lit) * (1 - 0.85 * comfort.tint);
   cabinFill.intensity = lights.ceiling ? comfort.light * (0.8 + 0.3 * (1 - sunVisible)) : 0;
   earthSpin.rotation.y = -(simTime / ORBIT) * Math.PI * 2 * 0.9;
+  sky.quaternion.setFromAxisAngle(ORBIT_N, th - THETA0);
   clouds.rotation.y = (simTime / ORBIT) * 0.25;
   const orbitN = Math.floor((th - THETA0) / (Math.PI * 2)) + 1;
   const inOrbit = ((simTime % ORBIT) + ORBIT) % ORBIT;
@@ -3050,6 +3157,7 @@ function toggleMute() {
   if (audio) audio.master.gain.value = muted ? 0 : 1;
   if (music.el) music.el.volume = muted ? 0 : music.vol;
   const sm = screenMedia(); if (sm) sm.volume = muted ? 0 : PROJ.vol;
+  STATIONS.forEach((st) => { if (st.pc.c64 && st.pc.mode === 'c64') try { st.pc.c64.muted = muted; } catch (e) {} });
 }
 
 /* ---------- música: casetes generativos y archivos propios ---------- */
@@ -3199,6 +3307,47 @@ function drawDeck() {
   deckTex.needsUpdate = true;
 }
 
+function vcrAction(id) {
+  click();
+  const n = VHS.tapes.length;
+  if (id === 'play') screenPause();
+  else if (id === 'stop') { if (VHS.playing) vhsStop(); }
+  else if (n) { VHS.idx = (VHS.idx + (id === 'next' ? 1 : -1) + n) % n; if (VHS.playing) vhsPlay(); }
+  syncComfortUI(); drawVcr(true);
+}
+function drawVcr(force) {
+  const v = screenMedia(), dur = v && isFinite(v.duration) ? v.duration : 0, t = v ? v.currentTime : VHS.t;
+  const tape = VHS.tapes[VHS.idx] || { name: '-' };
+  const st = !VHS.playing ? '■ DETENIDO' : screenPaused() ? '❚❚ PAUSA' : '▶ EN PANTALLA';
+  const time = VHS.playing ? fmtTime(t) + (dur ? ' / ' + fmtTime(dur) : '') : '--:--';
+  const sig = st + tape.name + time + VHS.idx + VHS.tapes.length;
+  if (!force && sig === VCR.sig) return;
+  VCR.sig = sig;
+  const x = vcrCanvas.getContext('2d'), W = vcrCanvas.width, H = vcrCanvas.height;
+  x.fillStyle = '#1b1f24'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#3a4048'; x.lineWidth = 3; x.strokeRect(6, 6, W - 12, H - 12);
+  // ranura con tapa: está, pero ninguna cinta entra ahí (los captadores ya las escanearon)
+  x.fillStyle = '#0d0f12'; x.fillRect(28, 30, 250, 62);
+  x.fillStyle = '#23272d'; x.fillRect(36, 38, 234, 46);
+  x.strokeStyle = '#3d434b'; x.lineWidth = 2; x.beginPath(); x.moveTo(36, 61); x.lineTo(270, 61); x.stroke();
+  x.fillStyle = '#9aa3ad'; x.font = 'bold 22px "IBM Plex Mono", monospace'; x.fillText('VHS', 36, 124);
+  x.fillStyle = '#5b6470'; x.font = '15px "IBM Plex Mono", monospace'; x.fillText('lee lo escaneado', 96, 122);
+  // visor
+  x.fillStyle = '#071318'; x.fillRect(300, 26, 312, 120);
+  x.fillStyle = '#7fe6ff'; x.shadowColor = 'rgba(90,220,255,0.6)'; x.shadowBlur = 8;
+  x.font = '28px VT323, monospace';
+  x.fillText(st, 314, 58);
+  x.fillText(String(tape.name).slice(0, 22), 314, 92);
+  x.font = '24px VT323, monospace';
+  x.fillText(`${VHS.tapes.length ? VHS.idx + 1 : 0}/${VHS.tapes.length}   ${time}`, 314, 128);
+  x.shadowBlur = 0;
+  x.fillStyle = '#9aa3ad'; x.font = '20px "IBM Plex Mono", monospace'; x.textAlign = 'center';
+  [['ANT', -0.21], ['PLAY', -0.07], ['STOP', 0.07], ['SIG', 0.21]].forEach(([tx, dz]) => x.fillText(tx, ((dz + VCR.w / 2) / VCR.w) * W, H - 66));
+  x.textAlign = 'left';
+  x.fillStyle = '#5b6470'; x.font = '14px "IBM Plex Mono", monospace'; x.fillText('ORBITA · VIDEO DE A BORDO', 28, H - 14);
+  vcrTex.needsUpdate = true;
+}
+
 /* ---------- terminal ---------- */
 const term = { lines: [''], input: '', cols: 60, rows: 18, history: [], hIdx: 0, dirty: true, cw: 12, lh: 28, pad: 26 };
 async function setupTermFont() {
@@ -3211,6 +3360,7 @@ async function setupTermFont() {
 }
 function write(s) {
   s = String(s);
+  if (B.cur) { writeAt(s); return; }
   for (const ch of s) {
     if (ch === '\n') { term.lines.push(''); continue; }
     const li = term.lines.length - 1;
@@ -3220,19 +3370,46 @@ function write(s) {
   if (term.lines.length > 400) term.lines.splice(0, term.lines.length - 400);
   term.dirty = true;
 }
-function cls() { term.lines = ['']; term.dirty = true; }
-function curCol() { return term.lines[term.lines.length - 1].length; }
+function cls() { term.lines = ['']; B.cur = null; term.dirty = true; }
+// LOCATE: escribe sobre la pantalla visible en vez de agregar al final
+function locate(r, c) {
+  while (term.lines.length < term.rows) term.lines.push('');
+  const base = term.lines.length - term.rows;
+  B.cur = { li: base + clamp(Math.floor(r), 1, term.rows) - 1, col: clamp(Math.floor(c), 1, term.cols) - 1 };
+}
+function writeAt(s) {
+  const k = B.cur;
+  for (const ch of s) {
+    if (ch === '\n') { k.li++; k.col = 0; while (term.lines.length <= k.li) term.lines.push(''); continue; }
+    if (k.col >= term.cols) continue;
+    let l = term.lines[k.li];
+    if (l.length < k.col) l = l.padEnd(k.col);
+    term.lines[k.li] = l.slice(0, k.col) + ch + l.slice(k.col + 1);
+    k.col++;
+  }
+  term.dirty = true;
+}
+function curCol() { return B.cur ? B.cur.col : term.lines[term.lines.length - 1].length; }
 let blink = true;
 function renderTerm(st = cur) {
   const x = st.tctx;
   x.fillStyle = '#0c0803'; x.fillRect(0, 0, TW, TH);
   const showInput = !B.running || B.waiting;
-  const last = term.lines[term.lines.length - 1] + (showInput ? term.input : '');
-  const wrapped = [];
-  for (let i = 0; i < last.length || i === 0; i += term.cols) wrapped.push(last.slice(i, i + term.cols));
-  if (showInput && blink && wrapped[wrapped.length - 1].length >= term.cols) wrapped.push('');
-  const all = term.lines.slice(0, -1).concat(wrapped);
-  const view = all.slice(-term.rows);
+  let view, curXY = null;
+  if (B.cur) {
+    // pantalla fija (LOCATE): lo que escribís aparece donde está el cursor
+    const all = term.lines.slice(), k = B.cur;
+    if (showInput) { const l = (all[k.li] || '').padEnd(k.col); all[k.li] = (l.slice(0, k.col) + term.input + l.slice(k.col + term.input.length)).slice(0, term.cols); }
+    view = all.slice(-term.rows);
+    curXY = [Math.min(term.cols - 1, k.col + term.input.length), k.li - (all.length - view.length)];
+  } else {
+    const last = term.lines[term.lines.length - 1] + (showInput ? term.input : '');
+    const wrapped = [];
+    for (let i = 0; i < last.length || i === 0; i += term.cols) wrapped.push(last.slice(i, i + term.cols));
+    if (showInput && blink && wrapped[wrapped.length - 1].length >= term.cols) wrapped.push('');
+    const all = term.lines.slice(0, -1).concat(wrapped);
+    view = all.slice(-term.rows);
+  }
   x.font = '28px VT323, monospace';
   x.textBaseline = 'top';
   // la ROM usa el tono de la perilla (en "color" queda ámbar)
@@ -3240,7 +3417,8 @@ function renderTerm(st = cur) {
   x.fillStyle = ph;
   x.shadowColor = ph; x.shadowBlur = 10;
   view.forEach((ln, i) => x.fillText(ln, term.pad, term.pad + i * term.lh));
-  if (showInput && blink) {
+  if (showInput && blink && curXY) x.fillRect(term.pad + curXY[0] * term.cw, term.pad + curXY[1] * term.lh + 22, term.cw, 4);
+  else if (showInput && blink) {
     const ln = view[view.length - 1] || '';
     x.fillRect(term.pad + ln.length * term.cw, term.pad + (view.length - 1) * term.lh + 22, term.cw, 4);
   }
@@ -3259,7 +3437,7 @@ const C_BUILTIN = {
   'LEEME.TXT': [
     'BIENVENIDO A BORDO',
     '',
-    'Esta computadora corre ORBITA-DOS y trae GW-BASIC.',
+    'Esta computadora corre ORBITA-DOS y trae su propio BASIC.',
     'Nada se rompe y nada se apura. Ctrl+C interrumpe',
     'cualquier programa.',
     '',
@@ -3273,9 +3451,142 @@ const C_BUILTIN = {
     '  BASIC             abre BASIC vacio',
     '',
     'La carpeta del escritorio es el manual de BASIC.',
-    'Los envios llegan por la escotilla, un ano por caja.'
+    'Los envios llegan por la escotilla, un ano por caja.',
+    '',
+    'Para jugar: BLOQUES o MONOS (dos monos se tiran bananas).'
   ].join('\n')
 };
+// dos juegos hechos en el BASIC de la estación (código libre, como el resto)
+C_BUILTIN['BLOQUES.BAS'] = `10 REM BLOQUES - ESTACION ORBITA (CODIGO LIBRE)
+20 CLS : DIM B(16, 18), CX(3), CY(3), S(7), P$(7)
+30 P$(1) = "01112131" : S(1) = 4 : P$(2) = "00100111" : S(2) = 2 : P$(3) = "10011121" : S(3) = 3
+40 P$(4) = "10200111" : S(4) = 3 : P$(5) = "00101121" : S(5) = 3 : P$(6) = "00011121" : S(6) = 3 : P$(7) = "20011121" : S(7) = 3
+50 FOR Y = 0 TO 18 : FOR X = 0 TO 16 : B(X, Y) = 0 : IF X < 3 OR X > 12 OR Y > 16 THEN B(X, Y) = 1
+60 NEXT X : NEXT Y
+70 PU = 0 : LI = 0 : NV = 1 : SPD = 16 : NP = INT(RND(1) * 7) + 1
+80 GOSUB 800
+100 P = NP : NP = INT(RND(1) * 7) + 1 : R = 0 : PX = 6 : PY = 1 : GOSUB 900
+110 GOSUB 500 : GOSUB 600 : IF OK = 0 THEN 400
+120 GOSUB 700 : G = 0
+200 K$ = INKEY$
+210 IF K$ = "" THEN 300
+220 QX = PX : QY = PY : QR = R
+230 IF K$ = "IZQUIERDA" OR K$ = "A" THEN PX = PX - 1
+240 IF K$ = "DERECHA" OR K$ = "D" THEN PX = PX + 1
+250 IF K$ = "ARRIBA" OR K$ = "W" THEN R = (R + 1) MOD 4
+260 IF K$ = "ABAJO" OR K$ = "S" THEN PY = PY + 1 : PU = PU + 1
+270 IF K$ = " " THEN GOSUB 650 : GOTO 330
+275 IF K$ = "Q" THEN 450
+280 GOSUB 750 : GOSUB 500 : GOSUB 600
+290 IF OK = 0 THEN PX = QX : PY = QY : R = QR : GOSUB 500
+295 GOSUB 700
+300 G = G + 1 : IF G < SPD THEN PAUSA 0.03 : GOTO 200
+310 G = 0 : GOSUB 750 : PY = PY + 1 : GOSUB 500 : GOSUB 600
+320 IF OK THEN GOSUB 700 : PAUSA 0.03 : GOTO 200
+325 PY = PY - 1 : GOSUB 500 : GOSUB 700
+330 FOR I = 0 TO 3 : B(CX(I), CY(I)) = P : NEXT I : BEEP 220, 0.05
+340 GOSUB 950
+350 GOTO 100
+400 LOCATE 8, 4 : PRINT "   FIN DEL JUEGO  "; : LOCATE 9, 4 : PRINT "  ENTER: OTRA VEZ "; : LOCATE 10, 4 : PRINT "  Q: SALIR        ";
+405 BEEP 160, 0.4
+410 K$ = INKEY$ : IF K$ = CHR$(13) THEN 50
+420 IF K$ <> "Q" THEN PAUSA 0.05 : GOTO 410
+450 CLS : PRINT "PUNTOS:"; PU; " LINEAS:"; LI : END
+500 FOR I = 0 TO 3 : X = VAL(MID$(P$(P), I * 2 + 1, 1)) : Y = VAL(MID$(P$(P), I * 2 + 2, 1))
+510 IF R > 0 THEN FOR K = 1 TO R : T = X : X = S(P) - 1 - Y : Y = T : NEXT K
+520 CX(I) = PX + X : CY(I) = PY + Y : NEXT I : RETURN
+600 OK = -1 : FOR I = 0 TO 3 : IF B(CX(I), CY(I)) THEN OK = 0
+610 NEXT I : RETURN
+650 GOSUB 750
+655 PY = PY + 1 : GOSUB 500 : GOSUB 600 : IF OK THEN PU = PU + 2 : GOTO 655
+660 PY = PY - 1 : GOSUB 500 : GOSUB 700 : RETURN
+700 FOR I = 0 TO 3 : LOCATE CY(I) + 1, 2 * CX(I) - 3 : PRINT "[]"; : NEXT I : RETURN
+750 FOR I = 0 TO 3 : LOCATE CY(I) + 1, 2 * CX(I) - 3 : PRINT "  "; : NEXT I : RETURN
+800 CLS : LOCATE 1, 7 : PRINT "B L O Q U E S";
+810 FOR Y = 1 TO 16 : GOSUB 850 : NEXT Y
+820 LOCATE 18, 2 : PRINT "+--------------------+";
+830 LOCATE 2, 27 : PRINT "PROXIMA"; : LOCATE 7, 27 : PRINT "PUNTOS"; : LOCATE 9, 27 : PRINT "LINEAS"; : LOCATE 11, 27 : PRINT "NIVEL";
+835 LOCATE 14, 27 : PRINT "FLECHAS: MOVER"; : LOCATE 15, 27 : PRINT "ARRIBA: GIRAR"; : LOCATE 16, 27 : PRINT "ESPACIO: CAER"; : LOCATE 17, 27 : PRINT "Q: SALIR";
+840 GOSUB 920 : RETURN
+850 L$ = "|" : FOR X = 3 TO 12 : C$ = "  " : IF B(X, Y) THEN C$ = "[]"
+860 L$ = L$ + C$ : NEXT X : LOCATE Y + 1, 2 : PRINT L$ + "|"; : RETURN
+900 FOR Y = 3 TO 5 : LOCATE Y, 27 : PRINT "        "; : NEXT Y
+910 FOR I = 0 TO 3 : X = VAL(MID$(P$(NP), I * 2 + 1, 1)) : Y = VAL(MID$(P$(NP), I * 2 + 2, 1)) : LOCATE 3 + Y, 27 + 2 * X : PRINT "[]"; : NEXT I
+920 LOCATE 8, 27 : PRINT PU; "   "; : LOCATE 10, 27 : PRINT LI; "   "; : LOCATE 12, 27 : PRINT NV; "   "; : RETURN
+950 N = 0 : Y = 16
+955 F = 1 : FOR X = 3 TO 12 : IF B(X, Y) = 0 THEN F = 0
+960 NEXT X : IF F = 0 THEN Y = Y - 1 : GOTO 990
+965 N = N + 1 : FOR Z = Y TO 2 STEP -1 : FOR X = 3 TO 12 : B(X, Z) = B(X, Z - 1) : NEXT X : NEXT Z
+970 FOR X = 3 TO 12 : B(X, 1) = 0 : NEXT X
+990 IF Y >= 1 THEN 955
+995 IF N = 0 THEN RETURN
+996 LI = LI + N : PU = PU + N * N * 100 : NV = INT(LI / 10) + 1 : SPD = 16 - NV * 2 : IF SPD < 3 THEN SPD = 3
+997 BEEP 660, 0.1 : GOSUB 810 : RETURN`;
+C_BUILTIN['MONOS.BAS'] = `10 REM MONOS - DOS MONOS SE TIRAN BANANAS (CODIGO LIBRE, ESTACION ORBITA)
+20 DIM T(60) : S1 = 0 : S2 = 0 : PI = 3.14159
+30 GOSUB 800 : TU = 1
+100 LOCATE 1, 1 : PRINT STRING$(44, " ");
+120 LOCATE 1, 1 : PRINT "MONO"; TU;
+130 GOSUB 900
+140 LOCATE 1, 9 : INPUT "ANGULO (0-90)"; A
+150 LOCATE 1, 9 : PRINT STRING$(20, " "); : LOCATE 1, 9 : INPUT "FUERZA (1-100)"; V
+155 LOCATE 1, 9 : PRINT STRING$(20, " ");
+160 IF A < 0 OR A > 90 OR V < 1 OR V > 100 THEN 100
+170 GOSUB 500
+180 IF HIT THEN 300
+190 TU = 3 - TU : GOTO 100
+300 IF HIT = 1 THEN S2 = S2 + 1
+310 IF HIT = 2 THEN S1 = S1 + 1
+320 LOCATE 1, 1 : PRINT STRING$(44, " "); : LOCATE 1, 1 : PRINT "CAYO EL MONO"; HIT; "!";
+325 FOR K = 1 TO 6 : BEEP 200 + K * 80, 0.08 : PAUSA 0.1 : NEXT K
+330 PAUSA 1.5
+340 IF S1 >= 3 OR S2 >= 3 THEN 400
+350 GOSUB 800 : TU = HIT : GOTO 100
+400 W = 1 : IF S2 >= 3 THEN W = 2
+410 CLS : PRINT : PRINT "  GANO EL MONO"; W; " ("; S1; "A"; S2; ")" : PRINT
+420 INPUT "OTRA PARTIDA (S/N)"; R$
+430 IF R$ = "S" OR R$ = "s" OR R$ = "Y" OR R$ = "y" THEN S1 = 0 : S2 = 0 : GOTO 30
+440 END
+500 D = 1 : X = M1 + 1 : Y = (R1 - 1) * 2.3 : IF TU = 2 THEN D = -1 : X = M2 - 1 : Y = (R2 - 1) * 2.3
+510 VX = D * V * COS(A * PI / 180) / 2 : VY = -V * SIN(A * PI / 180) / 2 : HIT = 0
+520 PC = 0 : PR = 0 : N = 0
+530 X = X + VX * 0.05 : Y = Y + VY * 0.05 : VY = VY + 20 * 0.05 : VX = VX + WI * 0.05
+540 C = INT(X + 0.5) : RW = INT(Y / 2.3 + 0.5)
+550 IF PC > 0 THEN LOCATE PR, PC : PRINT " ";
+560 PC = 0
+570 IF C < 1 OR C > 44 THEN RETURN
+580 IF RW > 18 THEN RETURN
+590 IF RW < 2 THEN 650
+600 IF N > 6 OR TU <> 1 THEN IF ABS(C - M1) <= 1 AND ABS(RW - R1) <= 1 THEN HIT = 1 : GOTO 700
+605 IF N > 6 OR TU <> 2 THEN IF ABS(C - M2) <= 1 AND ABS(RW - R2) <= 1 THEN HIT = 2 : GOTO 700
+610 IF RW >= T(C) THEN 700
+620 LOCATE RW, C : PRINT "*"; : PC = C : PR = RW
+650 N = N + 1 : PAUSA 0.03 : GOTO 530
+700 FOR K = 1 TO 3 : LOCATE RW, C : PRINT "X"; : BEEP 90 + K * 40, 0.06 : PAUSA 0.06 : LOCATE RW, C : PRINT "+"; : PAUSA 0.06 : NEXT K
+720 FOR K = C - 1 TO C + 1 : IF K >= 1 AND K <= 44 THEN IF T(K) <= RW + 1 THEN T(K) = RW + 2
+730 NEXT K
+740 FOR K = C - 1 TO C + 1 : IF K >= 1 AND K <= 44 THEN GOSUB 850
+745 NEXT K
+760 IF HIT = 1 THEN LOCATE R1, M1 : PRINT "%";
+765 IF HIT = 2 THEN LOCATE R2, M2 : PRINT "%";
+790 RETURN
+800 CLS : C = 1
+810 W = INT(RND(1) * 4) + 3 : HT = INT(RND(1) * 8) + 9
+815 FOR K = C TO C + W - 1 : IF K <= 44 THEN T(K) = HT
+820 NEXT K : C = C + W : IF C <= 44 THEN 810
+825 M1 = INT(RND(1) * 4) + 3 : M2 = 42 - INT(RND(1) * 4)
+830 R1 = T(M1) - 1 : R2 = T(M2) - 1 : WI = INT(RND(1) * 11) - 5
+840 FOR K = 1 TO 44 : GOSUB 850 : NEXT K : RETURN
+850 FOR Q = 2 TO 18 : LOCATE Q, K : IF Q < T(K) THEN PRINT " ";
+855 IF Q >= T(K) THEN PRINT "#";
+860 NEXT Q : IF K = M1 THEN LOCATE R1, M1 : PRINT "@";
+865 IF K = M2 THEN LOCATE R2, M2 : PRINT "@";
+870 RETURN
+900 LOCATE 1, 29 : PRINT S1; "A"; S2; : LOCATE 1, 37 : PRINT "V";
+905 IF WI < 0 THEN PRINT STRING$(-WI, "<");
+906 IF WI > 0 THEN PRINT STRING$(WI, ">");
+907 IF WI = 0 THEN PRINT "-";
+910 RETURN`;
 const DISKS = {
   juegos: { label: 'JUEGOS', color: 0x2b4d7a, files: {
     'ESTRELLA.BAS': ['10 REM CIELO AL AZAR', '20 FOR I = 1 TO 14', '30 PRINT SPC(INT(RND(1) * 50)); "*"', '40 PAUSA 0.15', '50 NEXT I', '60 PRINT "TODAS EN SU LUGAR."'].join('\n'),
@@ -3368,8 +3679,9 @@ function dos(line) {
       rdrive().cur = L; break;
     }
     case 'PC': pcSetMode('pc', null, cur); return;
+    case 'C64': pcSetMode('c64', null, cur); return;
     case 'AYUDA': case 'HELP':
-      write('PC       vuelve al DOS de la computadora\nDIR      lista los archivos\nTYPE     muestra un archivo\nA: C:    cambia de unidad\nBASIC    abre BASIC (BASIC NOMBRE carga y corre)\nCLS      limpia la pantalla\nHORA     estado de la orbita\nVER      version del sistema\nBORRAR   borra un archivo tuyo\nECO      repite un texto\n');
+      write('PC       vuelve al DOS de la computadora\nC64      pasa a la Commodore 64\nDIR      lista los archivos\nTYPE     muestra un archivo\nA: C:    cambia de unidad\nBASIC    abre BASIC (BASIC NOMBRE carga y corre)\nCLS      limpia la pantalla\nHORA     estado de la orbita\nVER      version del sistema\nBORRAR   borra un archivo tuyo\nECO      repite un texto\n');
       break;
     case 'DIR': {
       const files = driveFiles(rdrive().cur);
@@ -3401,7 +3713,7 @@ function dos(line) {
     case 'BORRAR': case 'DEL': write(deleteFile(arg) + '\n'); break;
     case 'BASIC': case 'GWBASIC': {
       mode = 'basic';
-      write('GW-BASIC 3.23\n(C) Microsoft 1983 - Estacion Orbita\n');
+      write('BASIC DE LA ESTACION 1.0\n');
       if (arg && loadProgram(arg)) { runProgram(); return; }
       write('Ok\n');
       return;
@@ -3440,7 +3752,7 @@ function ejectDisk(st = cur) {
   pcSyncA(st.pc);
   if (st.rom && st.drive.cur === 'A') {
     st.drive.cur = 'C';
-    if (st === cur && st.pc.mode !== 'pc' && mode === 'dos' && !B.running) write('\nDisquete retirado. Volviendo a C:\n\n' + prompt());
+    if (st === cur && st.pc.mode === 'rom' && mode === 'dos' && !B.running) write('\nDisquete retirado. Volviendo a C:\n\n' + prompt());
   }
   drawDrive(st);
   click();
@@ -3469,7 +3781,8 @@ function drawDrive(st = cur) {
 }
 
 /* ---------- BASIC ---------- */
-const B = { prog: new Map(), vars: {}, running: false, lines: [], li: 0, pos: 0, forStack: [], gosub: [], waiting: null, sleepUntil: 0, jumped: false };
+const CHR13 = String.fromCharCode(13);
+const B = { cur: null, keys: [], arrays: {}, prog: new Map(), vars: {}, running: false, lines: [], li: 0, pos: 0, forStack: [], gosub: [], waiting: null, sleepUntil: 0, jumped: false };
 class BErr extends Error {}
 function upperCode(s) { return s.replace(/"[^"]*"?|[^"]+/g, (m) => (m[0] === '"' ? m : m.toUpperCase())); }
 function tokenize(src) {
@@ -3520,7 +3833,8 @@ const FUNCS = {
   ASC: (a) => str(a).charCodeAt(0) || 0, 'STR$': (a) => (num(a) >= 0 ? ' ' : '') + fmtNum(a), VAL: (a) => parseFloat(str(a)) || 0,
   SPC: (a) => ' '.repeat(Math.max(0, num(a))), TAB: (a) => ' '.repeat(Math.max(0, num(a) - curCol())),
   'STRING$': (n, a) => (typeof a === 'number' ? String.fromCharCode(a) : str(a)[0] || ' ').repeat(Math.max(0, num(n))),
-  TIMER: () => Math.floor(simTime)
+  TIMER: () => Math.floor(simTime),
+  'INKEY$': () => (B.keys.length ? B.keys.shift() : '')
 };
 function expr(c) { return orE(c); }
 function orE(c) { let v = andE(c); while (isId(c, 'OR')) { c.i++; const r = andE(c); v = truthy(v) || truthy(r) ? -1 : 0; } return v; }
@@ -3577,11 +3891,35 @@ function primary(c) {
       }
       return FUNCS[t.v](...args);
     }
+    if (isOp(c, '(')) return arrRef(t.v, readIdx(c)).get();
     return getVar(t.v);
   }
   throw new BErr('Error de sintaxis');
 }
 function getVar(n) { if (n in B.vars) return B.vars[n]; return n.endsWith('$') ? '' : 0; }
+// listas: DIM A(10) o DIM M(9, 20); sin DIM, como en los BASIC de antes, llegan hasta 10
+function readIdx(c) {
+  expectOp(c, '(');
+  const ix = [Math.floor(num(expr(c)))];
+  while (isOp(c, ',')) { c.i++; ix.push(Math.floor(num(expr(c)))); }
+  expectOp(c, ')');
+  return ix;
+}
+function dimArr(n, dims) {
+  if (dims.some((d) => d < 0 || d > 10000) || dims.reduce((a, d) => a * (d + 1), 1) > 200000) throw new BErr('Lista demasiado grande');
+  B.arrays[n] = { dims, data: new Array(dims.reduce((a, d) => a * (d + 1), 1)).fill(n.endsWith('$') ? '' : 0) };
+}
+function arrRef(n, ix) {
+  if (!B.arrays[n]) dimArr(n, ix.map(() => 10));
+  const a = B.arrays[n];
+  if (ix.length !== a.dims.length) throw new BErr('Indice fuera de rango');
+  let k = 0;
+  for (let d = 0; d < ix.length; d++) { if (ix[d] < 0 || ix[d] > a.dims[d]) throw new BErr('Indice fuera de rango'); k = k * (a.dims[d] + 1) + ix[d]; }
+  return { get: () => a.data[k], set: (v) => {
+    if (n.endsWith('$') ? typeof v !== 'string' : typeof v !== 'number') throw new BErr('Tipos incompatibles');
+    a.data[k] = v;
+  } };
+}
 function setVar(n, v) {
   if (n.endsWith('$')) { if (typeof v !== 'string') throw new BErr('Tipos incompatibles'); }
   else if (typeof v !== 'number') throw new BErr('Tipos incompatibles');
@@ -3677,7 +4015,28 @@ function stmt(c, direct) {
     }
     case 'END': case 'STOP': c.i++; stopProgram(); return;
     case 'CLS': c.i++; cls(); return;
-    case 'BEEP': c.i++; beep(); return;
+    case 'BEEP': {
+      c.i++;
+      if (atEnd(c)) { beep(); return; }
+      const f = num(expr(c)); let d = 0.15;
+      if (isOp(c, ',')) { c.i++; d = num(expr(c)); }
+      beep(clamp(f, 40, 8000), clamp(d, 0.01, 2)); return;
+    }
+    case 'LOCATE': {
+      c.i++;
+      const r = num(expr(c)); expectOp(c, ',');
+      locate(r, num(expr(c))); return;
+    }
+    case 'DIM': {
+      c.i++;
+      for (;;) {
+        const n = readVarName(c);
+        dimArr(n, readIdx(c));
+        if (!isOp(c, ',')) break;
+        c.i++;
+      }
+      return;
+    }
     case 'PAUSA': case 'SLEEP': {
       c.i++;
       const s = atEnd(c) ? 1 : num(expr(c));
@@ -3699,6 +4058,7 @@ function stmt(c, direct) {
     // fallthrough
     default: {
       const v = readVarName(c);
+      if (isOp(c, '(')) { const ref = arrRef(v, readIdx(c)); expectOp(c, '='); ref.set(expr(c)); return; }
       expectOp(c, '=');
       setVar(v, expr(c));
     }
@@ -3718,13 +4078,14 @@ function buildLines() {
 }
 function runProgram() {
   buildLines();
-  B.vars = {}; B.forStack = []; B.gosub = []; B.waiting = null; B.sleepUntil = 0;
+  B.vars = {}; B.arrays = {}; B.keys = []; B.cur = null; B.forStack = []; B.gosub = []; B.waiting = null; B.sleepUntil = 0;
   B.li = 0; B.pos = 0;
   B.running = B.lines.length > 0;
   if (!B.running) write('Ok\n');
 }
 function stopProgram(msg) {
-  B.running = false; B.waiting = null;
+  B.running = false; B.waiting = null; B.keys = [];
+  if (B.cur) { B.cur = null; term.lines.push(''); }
   if (msg) write(msg + '\n');
   write('Ok\n');
 }
@@ -3983,16 +4344,15 @@ const CON2 = { z0: -2.75, z1: -1.25, x0: -0.62 };
 box(2.2 + CON2.x0 + 0.3, 0.78, CON2.z1 - CON2.z0, matConsole, (CON2.x0 - 2.5) / 2, 0.39, (CON2.z0 + CON2.z1) / 2);
 box(2.2 + CON2.x0 + 0.3, 0.04, CON2.z1 - CON2.z0 + 0.02, matDesk, (CON2.x0 - 2.5) / 2 + 0.02, 0.8, (CON2.z0 + CON2.z1) / 2);
 box(0.02, 0.02, CON2.z1 - CON2.z0, matGlow, CON2.x0 + 0.03, 0.78, (CON2.z0 + CON2.z1) / 2, false);
-const housing2 = box(1.2, 1.25, 0.9, matConsole, -1.85, DESK_TOP + 0.625, -2.0);
+const housing2 = box(1.2, 0.26, 0.9, matConsole, -1.85, DESK_TOP + 0.13, -2.0);
 const termCanvas2 = document.createElement('canvas'); termCanvas2.width = TW; termCanvas2.height = TH;
 const tctx2 = termCanvas2.getContext('2d');
 const termTex2 = new THREE.CanvasTexture(termCanvas2); termTex2.anisotropy = 8;
 const SCREEN2_C = new THREE.Vector3(-1.243, 1.47, -2.0);
 const screen2 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.375), new THREE.MeshBasicMaterial({ map: termTex2 }));
 screen2.position.copy(SCREEN2_C); screen2.rotation.y = Math.PI / 2; scene.add(screen2);
-[[0, 0.215, 0.6, 0.05], [0, -0.215, 0.6, 0.05], [0.275, 0, 0.05, 0.48], [-0.275, 0, 0.05, 0.48]].forEach(([dz, dy, wz, hy]) => {
-  box(0.05, hy, wz, matFrame, -1.235, SCREEN2_C.y + dy, SCREEN2_C.z + dz);
-});
+const FRAMES2 = [[0, 0.215, 0.6, 0.05], [0, -0.215, 0.6, 0.05], [0.275, 0, 0.05, 0.48], [-0.275, 0, 0.05, 0.48]].map(([dz, dy, wz, hy]) =>
+  box(0.05, hy, wz, matFrame, -1.235, SCREEN2_C.y + dy, SCREEN2_C.z + dz));
 const screenGlow2 = new THREE.PointLight(0x5dff8a, 0.25, 1.6, 2);
 screenGlow2.position.set(-0.95, 1.45, -2.0); scene.add(screenGlow2);
 const driveCanvas2 = document.createElement('canvas'); driveCanvas2.width = 256; driveCanvas2.height = 116;
@@ -4025,21 +4385,33 @@ function makeSwitch(knob, side) {
   // side 1: la estación mira hacia -x (pared derecha); -1: hacia +x
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0x23272c, roughness: 0.6, metalness: 0.5 })));
-  const lab = canvasTex(64, 96, (x, w, h) => { x.fillStyle = '#23272c'; x.fillRect(0, 0, w, h); x.fillStyle = '#c9a26a'; x.font = 'bold 22px monospace'; x.textAlign = 'center'; x.fillText('ROM', w / 2, 24); x.fillText('DOS', w / 2, h - 8); });
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.06), new THREE.MeshBasicMaterial({ map: lab }));
+  // perilla giratoria de tres posiciones: ROM, DOS y C64
+  const lab = canvasTex(128, 128, (x, w, h) => {
+    x.fillStyle = '#23272c'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#c9a26a'; x.font = 'bold 21px monospace'; x.textAlign = 'center';
+    [['ROM', -0.87], ['DOS', 0], ['C64', 0.87]].forEach(([t, a]) => {
+      x.fillText(t, w / 2 + Math.sin(a) * 42, h * 0.58 - Math.cos(a) * 42 + 7);
+      x.fillRect(w / 2 + Math.sin(a) * 24 - 1.5, h * 0.58 - Math.cos(a) * 24 - 1.5, 3, 3);
+    });
+  });
+  g.children[0].scale.set(1, 1.3, 1.6);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.064, 0.064), new THREE.MeshBasicMaterial({ map: lab }));
   face.rotation.y = -side * Math.PI / 2; face.position.x = -side * 0.0062; g.add(face);
-  const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.005, 0.03, 8), new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.3, metalness: 0.7 }));
-  lever.geometry.translate(0, 0.015, 0); lever.rotation.z = side * Math.PI / 2;
-  const pivot = new THREE.Group(); pivot.position.x = -side * 0.007; pivot.add(lever); g.add(pivot);
+  const knobM = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.35, metalness: 0.6 });
+  const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.014, 0.012, 20), knobM);
+  dial.rotation.z = Math.PI / 2;
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.011, 0.003), new THREE.MeshBasicMaterial({ color: 0xc8662a }));
+  mark.position.set(-side * 0.0065, 0.006, 0);
+  const pivot = new THREE.Group(); pivot.position.set(-side * 0.008, -0.0045, 0); pivot.add(dial, mark); g.add(pivot);
   g.position.copy(knob.position); g.position.z += side > 0 ? 0.075 : -0.075;
   scene.add(g);
   return { g, pivot };
 }
-const leverAngle = (st) => (st.pc.mode === 'rom' ? -1 : 1) * st.switchSide * 0.55;
+const leverAngle = (st) => ({ rom: -0.87, pc: 0, c64: 0.87 }[st.pc.mode] || 0) * st.switchSide;
 [[S1, 1], [S2, -1]].forEach(([st, side]) => {
   const sw = makeSwitch(st.knob, side);
   st.switchMesh = sw.g; st.switchLever = sw.pivot; st.switchSide = side;
-  sw.pivot.rotation.z = leverAngle(st);
+  sw.pivot.rotation.x = leverAngle(st);
 });
 S1.screen = screen; S2.screen = screen2;
 let cur = S1;
@@ -4093,7 +4465,8 @@ const PC_CONF = [
   'cls',
   'echo ORBITA PC - DOS 5.0',
   'echo C: disco rigido   A: disquetera',
-  'echo TYPE LEEME.TXT para empezar. NC abre el Norton Commander.',
+  'echo TYPE LEEME.TXT para empezar.',
+  'if exist NC\\NC.EXE echo NC abre el Norton Commander.',
   'if exist JUEGOS.TXT echo Juegos instalados: TYPE JUEGOS.TXT',
   'echo.'
 ].join('\n') + '\n';
@@ -4177,19 +4550,23 @@ function pcBoot(P) {
 let cPackP = null;
 function cPack() {
   if (!cPackP) cPackP = (async () => {
+    // libre/ viene siempre (juegos hechos para Órbita, código libre); c/ solo en la copia privada
     let list = [];
-    try { const r = await fetch('c/pack.json', { cache: 'no-cache' }); if (r.ok && /json/i.test(r.headers.get('content-type') || 'json')) list = (await r.json()).paquetes || []; } catch (e) {}
+    for (const base of ['libre/', 'c/']) {
+      try { const r = await fetch(base + 'pack.json', { cache: 'no-cache' }); if (r.ok && /json/i.test(r.headers.get('content-type') || 'json')) list = list.concat(((await r.json()).paquetes || []).map((pk) => Object.assign({ base }, pk))); } catch (e) {}
+    }
     const out = [], bats = [];
     for (const pk of list) {
       const dir = String(pk.carpeta || pk.zip.replace(/\.zip$/i, '')).toUpperCase().replace(/\\/g, '/');
       try {
-        let files = await idb.get('cpack:' + pk.zip);
+        const ck = 'cpack:' + (pk.base === 'c/' ? '' : pk.base) + pk.zip;
+        let files = await idb.get(ck);
         if (!files) {
           pcMsg(PC, 'Instalando ' + (pk.nombre || pk.zip) + '...'); if (S2.pc.status === 'loading') pcMsg(S2.pc, 'Instalando ' + (pk.nombre || pk.zip) + '...');
-          const r = await fetch('c/' + pk.zip);
+          const r = await fetch(pk.base + pk.zip);
           if (!r.ok) throw new Error(r.status);
           files = (await filesFromUpload(new File([await r.blob()], pk.zip))).files;
-          await idb.set('cpack:' + pk.zip, files);
+          await idb.set(ck, files);
         }
         files.forEach((f) => out.push({ path: dir + '/' + f.path, contents: f.contents }));
         if (pk.ejecutar) bats.push([pk.ejecutar.toUpperCase().slice(0, 8), dir, pk.ejecutar, pk.nombre || dir]);
@@ -4197,7 +4574,7 @@ function cPack() {
     }
     // un .BAT por juego en C:\ para arrancarlo desde cualquier lado, y JUEGOS.TXT con la lista
     bats.forEach(([b, dir, run]) => out.push({ path: b + '.BAT', contents: enc(crlf(['@echo off', 'c:', 'cd \\' + dir.replace(/\//g, '\\'), run, 'cd \\', ''].join('\n'))) }));
-    if (bats.length) out.push({ path: 'JUEGOS.TXT', contents: enc(crlf(['JUEGOS INSTALADOS EN C:', '', ...bats.map(([b, , , n]) => (b + '        ').slice(0, 10) + n), '', 'Escribi el nombre (por ejemplo ' + bats[0][0] + ') para jugar.', 'NC abre el Norton Commander.', ''].join('\n'))) });
+    if (bats.length) out.push({ path: 'JUEGOS.TXT', contents: enc(crlf(['JUEGOS INSTALADOS EN C:', '', ...bats.map(([b, , , n]) => (b + '        ').slice(0, 10) + n), '', 'Escribi el nombre (por ejemplo ' + bats[0][0] + ') para jugar.', ...(list.some((pk) => /^NC\.zip$/i.test(pk.zip)) ? ['NC abre el Norton Commander.'] : []), ''].join('\n'))) });
     return out;
   })();
   return cPackP;
@@ -4256,7 +4633,8 @@ function pcSetMode(m, note, st = cur) {
   const PC = st.pc;
   if (PC.mode === m) return;
   PC.mode = m; store.set(st.id === 1 ? 'orbita.pcmode' : 'orbita.pcmode' + st.id, m);
-  if (st.switchLever) st.switchLever.rotation.z = leverAngle(st);
+  if (st.switchLever) st.switchLever.rotation.x = leverAngle(st);
+  if (m !== 'c64' && st.pc.c64) c64Stop(st.pc);
   if (m === 'rom') {
     const was = cur;
     useRomOf(st);
@@ -4265,6 +4643,8 @@ function pcSetMode(m, note, st = cur) {
     write('ORBITA-DOS 3.30   ROM de la estacion ' + st.id + '\n' + (note ? note + '\n' : '') + 'Escribi PC o move la llave para volver al DOS.\n\n' + prompt());
     term.dirty = true; renderTerm(st);
     useRomOf(was);
+  } else if (m === 'c64') {
+    c64Start(PC);
   } else {
     PC.dirty = true;
     if (PC.ci) { PC.ci.sendKeyEvent(257, true); setTimeout(() => PC.ci && PC.ci.sendKeyEvent(257, false), 60); }
@@ -4282,10 +4662,44 @@ function useRomOf(st) {
   else { term.lines = ['']; term.input = ''; term.history = []; term.hIdx = 0; Object.assign(B, { prog: new Map(), vars: {}, running: false, lines: [], li: 0, pos: 0, forStack: [], gosub: [], waiting: null, sleepUntil: 0, jumped: false }); mode = 'dos'; write(prompt()); }
   cur = st; term.dirty = true;
 }
+const MODE_NAME = { rom: 'ROM de la estación (BASIC)', pc: 'DOS de la computadora', c64: 'Commodore 64' };
+const nextMode = (m) => ({ rom: 'pc', pc: 'c64', c64: 'rom' }[m] || 'pc');
 function flipSwitch(st) {
   click(); noiseBurst(0.05, 'highpass', 2000, 0.2, 3);
-  pcSetMode(st.pc.mode === 'pc' ? 'rom' : 'pc', null, st);
-  toast('Estación ' + st.id + ': ' + (st.pc.mode === 'pc' ? 'DOS de la computadora.' : 'ROM de la estación (BASIC).'), 3000);
+  pcSetMode(nextMode(st.pc.mode), null, st);
+  toast('Estación ' + st.id + ': ' + MODE_NAME[st.pc.mode] + '.', 3000);
+}
+/* Commodore 64: emulador libre (chips, zlib) con las ROM libres de MEGA65 (Open ROMs, LGPL); ver c64/NOTICE.txt */
+function c64Start(P) {
+  P.dirty = true; P.c64msg = 'Encendiendo la Commodore...';
+  if (P.c64) { P.c64.start(); if (audio) P.c64.muted = muted; return; }
+  if (P.c64p) return;
+  P.c64p = (window.C64 ? Promise.resolve() : loadScript('c64/c64.js'))
+    .then(() => C64.create({ base: 'c64/', crop: 'border' }))
+    .then((c) => {
+      P.c64 = c; P.c64p = null;
+      c.onframe = () => { P.dirty = true; };
+      if (P.mode === 'c64') { c.start(); if (audio) { try { c.muted = muted; c.volume = 0.6; } catch (e) {} } }
+    })
+    .catch((e) => { P.c64p = null; P.c64msg = 'La Commodore no pudo arrancar: ' + e.message; P.dirty = true; });
+}
+function c64Stop(P) { if (P.c64) { P.c64.stop(); try { P.c64.releaseAllKeys(); P.c64.muted = true; } catch (e) {} } }
+function renderC64(P) {
+  const st = P.st, x = st.tctx, tone = TONES[st.tone];
+  x.fillStyle = '#050505'; x.fillRect(0, 0, TW, TH);
+  if (P.c64 && P.c64.running) {
+    x.imageSmoothingEnabled = true;
+    x.filter = tone ? 'grayscale(1) contrast(1.2) brightness(1.4) blur(0.5px)' : 'blur(0.45px) saturate(1.05)';
+    x.drawImage(P.c64.canvas, 0, 0, P.c64.canvas.width, P.c64.canvas.height, 10, 8, TW - 20, TH - 16);
+    x.filter = 'none';
+    if (tone) { x.globalCompositeOperation = 'multiply'; x.fillStyle = tone; x.fillRect(0, 0, TW, TH); x.globalCompositeOperation = 'source-over'; }
+  } else {
+    x.font = '28px VT323, monospace'; x.textBaseline = 'top'; x.fillStyle = tone || '#a8a8ff';
+    x.fillText(P.c64msg || 'Commodore 64', 26, 26);
+  }
+  x.drawImage(crtMask, 0, 0);
+  st.termTex.needsUpdate = true;
+  P.dirty = false;
 }
 
 /* sonido de la PC: un búfer circular que se reproduce con remuestreo simple */
@@ -4377,6 +4791,7 @@ function updatePC(P, dt) {
     P.gain.gain.value = 0.55 / (1 + Math.max(0, dist - 0.8) * 0.9);
   }
   if (P.mode === 'pc' && P.dirty) renderPC(P);
+  else if (P.mode === 'c64' && P.dirty) renderC64(P);
 }
 
 /* disquetes de juegos: llegan vacíos o vírgenes y les cargás el archivo */
@@ -4435,7 +4850,7 @@ function markLoaded() {
 loadedDisks.forEach((k) => { if (DISKS[k]) DISKS[k].loaded = true; });
 function updateTermHelp() {
   const el = $('escHelp');
-  if (el) el.innerHTML = cur.pc.mode === 'pc' ? 'mantené <kbd>Esc</kbd> para levantarte' : '<kbd>Esc</kbd> levantarte';
+  if (el) el.innerHTML = cur.pc.mode === 'pc' ? 'mantené <kbd>Esc</kbd> para levantarte' : cur.pc.mode === 'c64' ? '<kbd>Esc</kbd> levantarte · <kbd>Tab</kbd> RUN/STOP' : '<kbd>Esc</kbd> levantarte';
 }
 updateTermHelp();
 
@@ -4446,6 +4861,74 @@ let state = 'menu'; // menu | walk | paused | terminal | tween | panel
 let tween = null;
 const termView = { base: new THREE.Vector3(0.0, 1.6, -1.9), yaw: -Math.PI / 2, pitch: -0.32, panX: 0, panY: 0, zoom: 0 };
 S1.view = termView;
+/* ---------- las computadoras se mueven: cada una es una caja con tubo, como una Macintosh compacta ---------- */
+const matCase = new THREE.MeshStandardMaterial({ color: 0xb9b2a2, roughness: 0.78, metalness: 0.04 });
+const MAC = { moving: null, rot: 0, dist: 1.2 };
+function makeMac(st, side, parts) {
+  const sc = st.screenC, g = new THREE.Group();
+  g.position.set(sc.x + side * 0.31, sc.y - 0.02, sc.z);
+  g.rotation.y = side > 0 ? 0 : Math.PI; // el frente es -x del grupo
+  scene.add(g); g.updateMatrixWorld(true);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.74, 0.66), matCase);
+  body.position.x = -0.05; body.castShadow = body.receiveShadow = true; g.add(body);
+  // el tubo de rayos catódicos asoma atrás, como en las compactas
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.33, 0.24, 4, 1), matCase);
+  tube.geometry.rotateY(Math.PI / 4); tube.geometry.rotateZ(-Math.PI / 2);
+  tube.position.x = 0.32; tube.castShadow = true; g.add(tube);
+  const grille = canvasTex(64, 64, (x, w, h) => { x.fillStyle = '#a8a192'; x.fillRect(0, 0, w, h); x.fillStyle = '#6f6a60'; for (let i = 0; i < 9; i++) x.fillRect(6, 6 + i * 6, w - 12, 2); });
+  [-1, 1].forEach((sz) => { const gr = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.12), new THREE.MeshStandardMaterial({ map: grille, roughness: 0.9 })); gr.position.set(0.05, 0.22, sz * 0.331); gr.rotation.y = sz > 0 ? 0 : Math.PI; g.add(gr); });
+  // el frente: disquetera abajo a la izquierda, perilla de tono y llave abajo a la derecha
+  st.drivePanel.position.set(sc.x, sc.y - 0.31, sc.z - side * 0.12);
+  st.drivePos.set(sc.x - side * 0.023, sc.y - 0.33, sc.z - side * 0.12);
+  st.knob.position.set(st.knob.position.x, sc.y - 0.31, sc.z + side * 0.17);
+  st.switchMesh.position.set(st.switchMesh.position.x, sc.y - 0.31, sc.z + side * 0.27);
+  parts.forEach((m) => g.attach(m));
+  const qi = g.quaternion.clone().invert();
+  st.mac = g; st.macParts = [body, tube];
+  st.macL = { sc: g.worldToLocal(sc.clone()), dp: g.worldToLocal(st.drivePos.clone()), dq: qi.clone().multiply(st.driveQ),
+    eo: st.ejectOff.clone().applyQuaternion(qi), ev: st.ejectVel.clone().applyQuaternion(qi), vb: g.worldToLocal(st.view.base.clone()), vy: st.view.yaw - g.rotation.y };
+  const sv = store.get('orbita.mac' + st.id, null);
+  if (sv && Array.isArray(sv.p)) { g.position.fromArray(sv.p); g.rotation.y = sv.ry || 0; }
+  applyMac(st);
+}
+// lo que depende de dónde está la computadora: la pantalla, la disquetera y desde dónde la mirás
+function applyMac(st) {
+  const g = st.mac, L = st.macL;
+  g.updateMatrixWorld(true);
+  st.screenC.copy(L.sc).applyMatrix4(g.matrixWorld);
+  st.drivePos.copy(L.dp).applyMatrix4(g.matrixWorld);
+  st.driveQ.copy(g.quaternion).multiply(L.dq);
+  st.ejectOff.copy(L.eo).applyQuaternion(g.quaternion); st.ejectVel.copy(L.ev).applyQuaternion(g.quaternion);
+  st.view.base.copy(L.vb).applyMatrix4(g.matrixWorld); st.view.yaw = g.rotation.y + L.vy;
+  items.forEach((it) => { if (it.kind === 'disk' && (it.inDrive === st.id || (it.inDrive === true && st.id === 1)) && !it.tween) { it.g.position.copy(st.drivePos); it.g.quaternion.copy(st.driveQ); } });
+}
+makeMac(S1, 1, [screen, ...FRAMES1, screenGlow, drivePanel, knob1, S1.switchMesh, keyboard]);
+makeMac(S2, -1, [screen2, ...FRAMES2, screenGlow2, drivePanel2, knob2, S2.switchMesh, keyboard2]);
+const macOf = (obj) => STATIONS.find((st) => { let p = obj; while (p) { if (p === st.mac) return true; p = p.parent; } return false; });
+function startMoveMac(st) {
+  if (held.it) releaseItem();
+  MAC.moving = st; MAC.rot = 0;
+  MAC.dist = clamp(camera.position.distanceTo(st.mac.position), 0.9, 2.2);
+  click(); toast('Llevá la computadora adonde quieras. La ruedita la gira; F o clic la deja ahí.', 7000);
+}
+function placeMacAtView() {
+  const st = MAC.moving, g = st.mac;
+  _sf.set(-Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), -Math.cos(player.yaw) * Math.cos(player.pitch));
+  const p = player.pos.clone().addScaledVector(_sf, MAC.dist);
+  // que quede adentro del módulo
+  const r = Math.hypot(p.x, p.y - POD.C), rMax = POD.A - 0.62;
+  if (r > rMax) { p.x *= rMax / r; p.y = POD.C + (p.y - POD.C) * rMax / r; }
+  p.z = clamp(p.z, POD.z0 + 0.6, POD.z1 - 0.6);
+  g.position.copy(p);
+  g.rotation.y = player.yaw + Math.PI / 2 + MAC.rot;
+  applyMac(st);
+}
+function dropMac() {
+  const st = MAC.moving; if (!st) return;
+  MAC.moving = null; click();
+  store.set('orbita.mac' + st.id, { p: st.mac.position.toArray().map((v) => +v.toFixed(3)), ry: +st.mac.rotation.y.toFixed(3) });
+  noiseBurst(0.12, 'lowpass', 400, 0.2, 0.7);
+}
 const _tv = new THREE.Vector3();
 function termPose(outPos, outQ) {
   const v = cur.view;
@@ -4477,12 +4960,12 @@ function toast(msg, ms = 6000) {
 }
 
 const targets = [
-  { objs: [screen, housing, kbBody], label: () => 'usar la computadora', act: () => enterTerminal(S1) },
+  { objs: [screen, kbBody, ...S1.macParts], label: () => 'usar la computadora (F: moverla)', act: () => enterTerminal(S1) },
   ...STATIONS.map((st) => ({ objs: [st.drivePanel], label: () => driveLabel(st), act: () => driveAction(st) })),
-  { objs: [screen2, housing2, kbBody2], label: () => 'usar la estación 2', act: () => enterTerminal(S2) },
-  ...STATIONS.map((st) => ({ objs: [st.switchMesh], label: () => 'llave de la estación ' + st.id + ': ' + (st.pc.mode === 'pc' ? 'pasar a la ROM' : 'pasar al DOS'), act: () => flipSwitch(st) })),
+  { objs: [screen2, kbBody2, ...S2.macParts], label: () => 'usar la estación 2 (F: moverla)', act: () => enterTerminal(S2) },
+  ...STATIONS.map((st) => ({ objs: [st.switchMesh], label: () => 'perilla de la estación ' + st.id + ': pasar a ' + { rom: 'la ROM', pc: 'el DOS', c64: 'la Commodore 64' }[nextMode(st.pc.mode)], act: () => flipSwitch(st) })),
   ...STATIONS.map((st) => ({ objs: [st.knob], label: () => 'cambiar el tono del monitor (' + TONE_NAME[st.tone] + ')', act: () => cycleTone(st) })),
-  { objs: blankBoxMeshes, label: () => 'sacar un disquete virgen', act: () => newBlankDisk() },
+  { objs: blankBoxMeshes, label: () => 'disquetes: uno virgen o uno grabado con un zip tuyo', act: () => openComfort('disk') },
   { objs: [switchPlate, switchNub], label: () => (lights.ceiling ? 'apagar las luces' : 'prender las luces'), act: () => toggleCeiling() },
   { objs: [lampShade, bulb], label: () => (lights.lamp ? 'apagar la lámpara' : 'prender la lámpara'), act: () => toggleLamp() },
   { objs: [comfortPanel], label: () => 'usar el terminal de confort', act: () => openComfort() },
@@ -4492,6 +4975,11 @@ const targets = [
   { objs: [deckButtons.prev], label: () => 'casete anterior', act: () => deckAction('prev') },
   { objs: [deckButtons.next], label: () => 'casete siguiente', act: () => deckAction('next') },
   { objs: [deckButtons.load], label: () => 'cargar tu propia música', act: () => deckAction('load') },
+  { objs: [vcrFace, vcrBody], label: () => 'ver qué pasa la pantalla', act: () => openComfort('screen') },
+  { objs: [vcrButtons.play], label: () => (!VHS.playing ? 'pasar la cinta en la pantalla' : screenPaused() ? 'seguir' : 'pausa'), act: () => vcrAction('play') },
+  { objs: [vcrButtons.stop], label: () => 'detener la cinta', act: () => vcrAction('stop') },
+  { objs: [vcrButtons.prev], label: () => 'cinta anterior', act: () => vcrAction('prev') },
+  { objs: [vcrButtons.next], label: () => 'cinta siguiente', act: () => vcrAction('next') },
   { objs: [btnHatch], label: () => (HATCH.open ? 'cerrar la escotilla' : 'abrir la escotilla'), act: () => setHatch(!HATCH.open) },
   { objs: [btnExpel, airPanel], label: () => 'expulsar lo que hay en la esclusa', act: () => expel() },
   { objs: [btnCapture, sonarPanel], label: () => { const c = contact(); return c && c.inZone ? 'capturar los restos de ' + c.year : 'usar el sonar'; }, act: () => sonarCapture() },
@@ -4537,6 +5025,7 @@ function setUI() {
   $('musicUI').hidden = !(state === 'panel' && panelName === 'music');
   $('navUI').hidden = !(state === 'panel' && panelName === 'nav');
   $('lootUI').hidden = !(state === 'panel' && panelName === 'loot');
+  $('diskUI').hidden = !(state === 'panel' && panelName === 'disk');
   if (state !== 'walk') hint.hidden = true;
   if (state === 'paused') {
     veil.hidden = false; veil.classList.add('clear');
@@ -4557,6 +5046,7 @@ function enterTerminal(st = S1) {
   termPose(to.pos, to.q);
   tween = { t: 0, from, to, done: () => { state = 'terminal'; if (!isTouch) focusTyper(); setUI(); } };
   if (cur.pc.mode === 'pc' && cur.pc.status === 'off') pcBoot(cur.pc);
+  if (cur.pc.mode === 'c64') c64Start(cur.pc);
   setUI();
 }
 function exitTerminal() {
@@ -4565,7 +5055,7 @@ function exitTerminal() {
   if (held.it) releaseItem();
   state = 'tween';
   typer.blur();
-  pcReleaseAll(cur.pc); pcSave(cur.pc);
+  pcReleaseAll(cur.pc); pcSave(cur.pc); if (cur.pc.c64) try { cur.pc.c64.releaseAllKeys(); } catch (e) {}
   player.pos.copy(camera.position); player.vel.set(0, 0, 0);
   player.yaw = cur.view.yaw + (cur === S1 ? 0.4 : -0.4); player.pitch = -0.15;
   playerConstrain(player.pos, player.vel);
@@ -4645,6 +5135,9 @@ $('cClose').addEventListener('click', closeComfort);
 $('sMove').addEventListener('click', startMoveScreen);
 $('sWall').addEventListener('click', () => { PROJ.free = null; layoutScreen(); saveScreen(); syncComfortUI(); });
 $('lClose').addEventListener('click', closeComfort);
+$('dClose').addEventListener('click', closeComfort);
+$('dBlank').addEventListener('click', () => { closeComfort(); newBlankDisk(); });
+$('dZip').addEventListener('click', () => { closeComfort(); askDiskFile(null); });
 {
   const sel = $('pais');
   Object.entries(PAISES).sort((a, b) => (a[0] ? 1 : 0) - (b[0] ? 1 : 0) || a[1][0].localeCompare(b[1][0])).forEach(([k, [n]]) => { const o = document.createElement('option'); o.value = k; o.textContent = n; sel.appendChild(o); });
@@ -4785,7 +5278,7 @@ $('loadStart').addEventListener('click', async () => {
 $('loadInput').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importGame(f); });
 $('enter').addEventListener('click', () => {
   startAudio();
-  setTimeout(() => { if (PC.mode === 'pc') pcBoot(PC); else pcAudioStart(PC); }, 1500);
+  setTimeout(() => { if (PC.mode === 'pc') pcBoot(PC); else pcAudioStart(PC); STATIONS.forEach((st) => { if (st.pc.mode === 'c64') c64Start(st.pc); }); }, 1500);
   if (state === 'menu' || state === 'paused') {
     state = 'walk';
     veil.hidden = true;
@@ -4824,6 +5317,7 @@ function openAimed() {
 function walkClick(e) {
   if (performance.now() < noAimUntil) return;
   if (PROJ.moving) { dropScreen(); return; }
+  if (MAC.moving) { dropMac(); return; }
   if (held.it) {
     // Shift+clic lo suelta aunque estés apuntando a una pared (sin velcro)
     if (!(e && e.shiftKey) && stickWins() && stickHeld()) return;
@@ -5029,6 +5523,7 @@ window.addEventListener('wheel', (e) => {
     if (e.ctrlKey) e.preventDefault(); return;
   }
   if (state === 'walk' && PROJ.moving) { PROJ.moveDist = clamp(PROJ.moveDist - e.deltaY * 0.002, 1.2, 4.5); return; }
+  if (state === 'walk' && MAC.moving) { if (e.shiftKey) MAC.dist = clamp(MAC.dist - e.deltaY * 0.002, 0.8, 2.6); else MAC.rot -= e.deltaY * 0.004; return; }
   if (state === 'walk') {
     if (held.it && held.rotating) rotateHeld(0, 0, -e.deltaY * 0.004);
     else if (held.it) held.dist = clamp(held.dist - e.deltaY * 0.001, 0.4, 1.6);
@@ -5096,6 +5591,12 @@ hold('fwd', 'KeyW'); hold('back', 'KeyS');
 
 window.addEventListener('keydown', (e) => {
   if (state === 'terminal' && e.key === 'Escape' && (mouseCap.on || performance.now() - mouseCap.endedAt < 400)) { e.preventDefault(); endMouseCap(); return; }
+  if (state === 'terminal' && cur.pc.mode === 'c64') {
+    if (e.key === 'Escape') { e.preventDefault(); exitTerminal(); return; }
+    // Tab hace de RUN/STOP; lo demás va tal cual al teclado de la Commodore
+    if (cur.pc.c64 && cur.pc.c64.key(true, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key)) e.preventDefault();
+    return;
+  }
   if (state === 'terminal' && cur.pc.mode === 'pc') {
     if (cur.pc.ci) pcKey(cur.pc, e, true);
     else if (e.key === 'Escape') { e.preventDefault(); exitTerminal(); }
@@ -5108,6 +5609,9 @@ window.addEventListener('keydown', (e) => {
       if (B.running) { const ln = B.lines[B.li] ? B.lines[B.li].n : ''; term.input = ''; write('\n'); stopProgram('Interrumpido en ' + ln); }
       return;
     }
+    // un programa corriendo lee las flechas y Enter con INKEY$
+    const SPECIAL = { ArrowUp: 'ARRIBA', ArrowDown: 'ABAJO', ArrowLeft: 'IZQUIERDA', ArrowRight: 'DERECHA', Enter: CHR13 };
+    if (B.running && !B.waiting && SPECIAL[e.key]) { e.preventDefault(); if (B.keys.length < 16) B.keys.push(SPECIAL[e.key]); return; }
     if (e.key === 'Enter') { e.preventDefault(); click(); submitLine(); return; }
     if (e.key === 'Backspace') { e.preventDefault(); term.input = term.input.slice(0, -1); term.dirty = true; click(); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -5134,7 +5638,12 @@ window.addEventListener('keydown', (e) => {
       $('speedLine').textContent = timeScale === 0 ? 'Órbita detenida · T para seguir' : 'Tiempo acelerado ×30';
     }
     if (e.code === 'KeyM') toggleMute();
-    if (e.code === 'KeyF' && state === 'walk' && !openAimed()) walkClick();
+    if (e.code === 'KeyF' && state === 'walk') {
+      const mst = !held.it && aimed && aimed.target && STATIONS.find((st) => aimed.target.objs.includes(st.screen));
+      if (MAC.moving) dropMac();
+      else if (mst) startMoveMac(mst);
+      else if (!openAimed()) walkClick();
+    }
     if (e.code === 'KeyL') toggleCeiling();
     if (e.code === 'KeyP') deckAction('play');
     if (e.code === 'KeyX' && state === 'walk') discardItem();
@@ -5146,18 +5655,20 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
   if (cur.pc.ci && (cur.pc.down.size || cur.pc.escAt)) pcKey(cur.pc, e, false);
+  if (cur.pc.c64 && cur.pc.mode === 'c64') cur.pc.c64.key(false, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key);
 });
 window.addEventListener('blur', () => STATIONS.forEach((st) => pcReleaseAll(st.pc)));
 typer.addEventListener('input', () => {
   const v = typer.value.replace(/[\r\n]/g, '');
   typer.value = '';
-  if (state !== 'terminal' || !v || cur.pc.mode === 'pc') return;
-  if (B.running && !B.waiting) return;
+  if (state !== 'terminal' || !v || cur.pc.mode !== 'rom') return;
+  if (B.running && !B.waiting) { if (B.keys.length < 16) B.keys.push(...v.toUpperCase()); return; }
   term.input += v; term.dirty = true; click();
 });
 typer.addEventListener('blur', () => { if (state === 'terminal' && !isTouch) setTimeout(focusTyper, 0); });
 
 /* colisiones del cuerpo: dentro del octógono, sin atravesar consola, casetera ni pantalla */
+const _pc = new THREE.Vector3();
 function playerConstrain(p, v) {
   const r = 0.3;
   for (const n of FACE_N) {
@@ -5178,20 +5689,30 @@ function playerConstrain(p, v) {
   player.lastZ = p.z;
   if (p.z > zMax) { p.z = zMax; v.z = Math.min(0, v.z) * 0.2; }
   const push = (xMax) => { if (p.x > xMax) { p.x = xMax; v.x = Math.min(0, v.x) * 0.2; } };
-  if (p.z > CON.z0 - r && p.z < CON.z1 + r) { if (p.y < DESK_TOP + r) push(CON.x0 - r); else if (p.y < 2.1 + r && p.z > -2.65 - r && p.z < -1.15 + r) push(1.25 - r); }
+  if (p.z > CON.z0 - r && p.z < CON.z1 + r) { if (p.y < DESK_TOP + r) push(CON.x0 - r); else if (p.y < 1.08 + r && p.z > -2.65 - r && p.z < -1.15 + r) push(1.25 - r); }
   if (p.z > DECK.z - 0.55 && p.z < DECK.z + 0.55 && p.y < DECK.y + 0.3) push(DECK.x - r);
+  if (p.z > VCR.z - 0.45 && p.z < VCR.z + 0.45 && p.y < VCR.y + 0.25) push(VCR.x - r);
+  // las computadoras: una caja que no se atraviesa, esté donde esté
+  for (const st of STATIONS) {
+    if (!st.mac || MAC.moving === st) continue;
+    const l = st.mac.worldToLocal(_pc.copy(p)), lo = [-0.3 - r, -0.37 - r, -0.33 - r], hi = [0.44 + r, 0.37 + r, 0.33 + r], a = l.toArray();
+    if (a.some((c, i) => c <= lo[i] || c >= hi[i])) continue;
+    let best = 0, bd = Infinity, bv = 0;
+    a.forEach((c, i) => { if (c - lo[i] < bd) { bd = c - lo[i]; best = i; bv = lo[i]; } if (hi[i] - c < bd) { bd = hi[i] - c; best = i; bv = hi[i]; } });
+    a[best] = bv; l.fromArray(a); st.mac.localToWorld(l); p.copy(l); v.multiplyScalar(0.3);
+  }
   const pushL = (xMin) => { if (p.x < xMin) { p.x = xMin; v.x = Math.max(0, v.x) * 0.2; } };
   if (p.y > 1.3 - r && p.y < 2.95 + r) {
     if (p.z > 2.45 - r && p.z < 3.95 + r) push(1.83 - r);
     if (p.z > 3.1 - r && p.z < 4.2 + r) pushL(-1.83 + r);
   }
-  if (p.z > CON2.z0 - r && p.z < CON2.z1 + r) { if (p.y < DESK_TOP + r) pushL(CON2.x0 + r); else if (p.y < 2.1 + r && p.z > -2.45 - r && p.z < -1.55 + r) pushL(-1.25 + r); }
+  if (p.z > CON2.z0 - r && p.z < CON2.z1 + r) { if (p.y < DESK_TOP + r) pushL(CON2.x0 + r); else if (p.y < 1.08 + r && p.z > -2.45 - r && p.z < -1.55 + r) pushL(-1.25 + r); }
   if (p.x < -2.13 + r && p.z > 2.3 && p.z < 2.9) p.x = -2.13 + r;
 }
 
 /* ---------- bucle ---------- */
 const clock = new THREE.Clock();
-let blinkT = 0, deckT = 0, saveT = 0, airT = 0;
+let blinkT = 0, deckT = 0, saveT = 0, airT = 0, vcrT = 0;
 const fwd = new THREE.Vector3(), right = new THREE.Vector3(), acc = new THREE.Vector3();
 const _camGoal = new THREE.Vector3(), _camGoalQ = new THREE.Quaternion();
 const safeErr = {};
@@ -5227,11 +5748,119 @@ function updateHatch(dt) {
   airT += dt; if (airT > 0.5) { airT = 0; drawAirPanel(); }
   items.forEach((it) => { if (it.lidT > 0 && it.lidT < 1) { it.lidT = Math.min(1, it.lidT + dt / 0.6); it.g.userData.lidPivot.rotation.x = 1.9 * (1 - Math.pow(1 - it.lidT, 3)); } });
 }
+/* ---------- restos flotando afuera: pasan por las ventanas y se nota que vamos en órbita ---------- */
+// fluyen en el sentido en que se mueve la superficie de la Tierra debajo del módulo
+const DEBRIS = { flow: new THREE.Vector3(), list: [], meshes: [], dust: null, HALF: 90 };
+{
+  const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(earthPivot.quaternion);
+  const up = EARTH_C.clone().negate().normalize(); // de la Tierra hacia el módulo
+  DEBRIS.flow.crossVectors(axis, up).negate().normalize(); // earthSpin gira en sentido negativo
+  DEBRIS.up = up;
+  const rnd = mulberry(4242);
+  // roca: un icosaedro abollado, con cada vértice corrido un poco
+  function rockGeo() {
+    const g = new THREE.IcosahedronGeometry(1, 1), pa = g.attributes.position, r2 = mulberry(77), seen = new Map(), v = new THREE.Vector3();
+    for (let i = 0; i < pa.count; i++) {
+      v.fromBufferAttribute(pa, i); const k = v.toArray().map((n) => n.toFixed(3)).join();
+      if (!seen.has(k)) seen.set(k, 0.7 + r2() * 0.5);
+      v.multiplyScalar(seen.get(k)); pa.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.05, roughness: 0.95, flatShading: true });
+  const mats = [
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.45 }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.3 })
+  ];
+  const shapes = [
+    [new THREE.IcosahedronGeometry(1, 0), 70, 0.04, 0.3, mats[0]],      // pedazos de casco
+    [new THREE.BoxGeometry(1, 0.05, 0.7), 40, 0.12, 0.7, mats[1]],      // chapas y aislante dorado
+    [new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6), 24, 0.2, 0.9, mats[0]], // tubos y antenas rotas
+    [rockGeo(), 34, 0.25, 2.2, rockMat]                                      // rocas, pedacitos de asteroide
+  ];
+  const tints = [0x8a8f96, 0x6d7076, 0xc9a24a, 0xd8d6cc, 0x3a3c40, 0xb08a3a];
+  const rockTints = [0x5a524a, 0x6e665c, 0x4a4540, 0x7a6e60, 0x3e3a36];
+  const col = new THREE.Color();
+  shapes.forEach(([geo, n, s0, s1, mat]) => {
+    const m = new THREE.InstancedMesh(geo, mat, n);
+    m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false;
+    for (let i = 0; i < n; i++) {
+      const sc = s0 + Math.pow(rnd(), 2) * (s1 - s0);
+      const d = { m, i, p: new THREE.Vector3(), v: 0, q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6, rnd() * 6, rnd() * 6)),
+        axis: new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize(), w: (rnd() - 0.5) * 1.2,
+        s: new THREE.Vector3(sc * (0.6 + rnd() * 0.8), sc * (0.6 + rnd() * 0.8), sc * (0.6 + rnd() * 0.8)), drift: new THREE.Vector3((rnd() - 0.5) * 0.25, (rnd() - 0.5) * 0.25, (rnd() - 0.5) * 0.25) };
+      const tt = mat === rockMat ? rockTints : tints;
+      m.setColorAt(i, col.setHex(tt[Math.floor(rnd() * tt.length)]));
+      debrisPlace(d, rnd, true);
+      DEBRIS.list.push(d);
+    }
+    m.instanceColor.needsUpdate = true;
+    scene.add(m); DEBRIS.meshes.push(m);
+  });
+  // polvo y astillas cerca: lo que más hace sentir la velocidad
+  const N = 260, pos = new Float32Array(N * 3), g = new THREE.BufferGeometry();
+  DEBRIS.dustV = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const p = dustSpot(rnd, true); pos.set([p.x, p.y, p.z], i * 3); DEBRIS.dustV[i] = 1.2 + rnd() * 2.5; }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  DEBRIS.dust = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xc8ccd4, size: 0.06, sizeAttenuation: true, transparent: true, opacity: 0.5, depthWrite: false }));
+  DEBRIS.dust.frustumCulled = false;
+  scene.add(DEBRIS.dust);
+  DEBRIS.rnd = rnd;
+}
+// un lugar al costado del camino: lejos del módulo y sin meterse en la Tierra
+function debrisPlace(d, rnd, anywhere) {
+  const f = DEBRIS.flow, side = new THREE.Vector3();
+  for (let k = 0; k < 20; k++) {
+    side.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5); side.addScaledVector(f, -side.dot(f)).normalize();
+    const r = 16 + Math.pow(rnd(), 1.3) * 60; // nada muy cerca: que acompañe sin llamar la atención
+    side.multiplyScalar(r);
+    if (side.dot(DEBRIS.up) < -24) continue; // del lado de la Tierra, no más de 24 m
+    // que pase lejos del casco (el módulo va de z = -4.5 a 6.3)
+    let ok = true;
+    for (let z = -5.5; z <= 7; z += 1.5) { const q = new THREE.Vector3(0, POD.C, z); const dq = q.sub(side); dq.addScaledVector(f, -dq.dot(f)); if (dq.length() < 5.5) { ok = false; break; } }
+    if (ok) break;
+  }
+  d.p.copy(side).addScaledVector(f, anywhere ? (rnd() * 2 - 1) * DEBRIS.HALF : -DEBRIS.HALF);
+  d.v = 0.5 + rnd() * 2.2;
+}
+function dustSpot(rnd, anywhere) {
+  const f = DEBRIS.flow, side = new THREE.Vector3();
+  side.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5); side.addScaledVector(f, -side.dot(f)).normalize().multiplyScalar(12 + rnd() * 18);
+  return side.addScaledVector(f, anywhere ? (rnd() * 2 - 1) * 35 : -35).add(new THREE.Vector3(0, POD.C, 0.9));
+}
+const _dm = new THREE.Matrix4(), _dq = new THREE.Quaternion();
+function updateDebris(dts) {
+  const f = DEBRIS.flow, rnd = DEBRIS.rnd;
+  for (const d of DEBRIS.list) {
+    if (dts) {
+      d.p.addScaledVector(f, d.v * dts).addScaledVector(d.drift, dts);
+      d.q.multiply(_dq.setFromAxisAngle(d.axis, d.w * dts));
+      if (d.p.dot(f) > DEBRIS.HALF) debrisPlace(d, rnd, false);
+    }
+    d.m.setMatrixAt(d.i, _dm.compose(d.p, d.q, d.s));
+  }
+  DEBRIS.meshes.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+  // de noche (en la sombra de la Tierra) apenas se ven
+  const lum = 0.15 + 0.85 * sunVisible;
+  DEBRIS.dust.material.opacity = 0.05 + 0.4 * sunVisible;
+  if (dts) {
+    const a = DEBRIS.dust.geometry.attributes.position, arr = a.array, c = new THREE.Vector3(0, POD.C, 0.9);
+    for (let i = 0; i < DEBRIS.dustV.length; i++) {
+      arr[i * 3] += f.x * DEBRIS.dustV[i] * dts; arr[i * 3 + 1] += f.y * DEBRIS.dustV[i] * dts; arr[i * 3 + 2] += f.z * DEBRIS.dustV[i] * dts;
+      const along = (arr[i * 3] - c.x) * f.x + (arr[i * 3 + 1] - c.y) * f.y + (arr[i * 3 + 2] - c.z) * f.z;
+      if (along > 35) { const p = dustSpot(rnd, false); arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; }
+    }
+    a.needsUpdate = true;
+  }
+  return lum;
+}
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
   simTime += dt * timeScale;
   updateOrbit();
+  updateDebris(dt * Math.min(timeScale, 8));
   earthUniforms.cloudShift.value = clouds.rotation.y / (Math.PI * 2);
 
   if (state === 'walk') {
@@ -5264,6 +5893,7 @@ function frame() {
     let label = null;
     if (CHARGE.at && held.it) { const k = chargeK(); label = 'tirar con fuerza ' + '▮'.repeat(Math.round(k * 10)) + '▯'.repeat(10 - Math.round(k * 10)) + ' · soltá el botón del medio'; }
     else if (PROJ.moving) label = 'dejar la pantalla acá';
+    else if (MAC.moving) label = 'dejar la computadora acá (F o clic) · ruedita: girarla · Shift+ruedita: acercarla';
     else if (stickWins()) label = 'pegar ' + held.it.label + ' (velcro)' + (isTouch ? '' : ' · Shift+clic: soltar · botón del medio: tirar');
     else if (aimed && aimed.target) label = aimed.target.label();
     else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && (!aimed.item.opened || (aimed.item.kind === 'crate' && lootPick && lootLeft(aimed.item.id).length)) ? ' (F o doble clic derecho: abrir)' : aimed.item.kind === 'magazine' ? ' (R para leer)' : '');
@@ -5300,9 +5930,10 @@ function frame() {
   saveT += dt; if (saveT > 3) { saveT = 0; if (items.some((it) => it.dirty)) { items.forEach((it) => { it.dirty = false; }); saveItems(); } }
   blinkT += dt;
   if (blinkT > 0.5) { blinkT = 0; blink = !blink; term.dirty = true; }
-  if (cur.pc.mode !== 'pc' && term.dirty) renderTerm();
+  if (cur.pc.mode === 'rom' && term.dirty) renderTerm();
   STATIONS.forEach((st) => updatePC(st.pc, dt));
   if (music.playing) { music.reel += dt * 2.5; deckT += dt; if (deckT > 0.2) { deckT = 0; drawDeck(); } }
+  vcrT += dt; if (vcrT > 0.25) { vcrT = 0; drawVcr(); }
   screenGlow.intensity = 0.3 + Math.random() * 0.02;
   renderer.render(scene, camera);
   safe('imágenes', updateHoles);
