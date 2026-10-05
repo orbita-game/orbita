@@ -134,7 +134,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   <kbd>W A S D</kbd> flotar · <kbd>Q</kbd> subir · <kbd>E</kbd> bajar · <kbd>Shift</kbd> más rápido · <kbd>mouse</kbd> mirar<br>
   clic agarra y suelta objetos · <kbd>botón del medio</kbd> lo tira (más apretado, más fuerte) · ruedita acerca o aleja<br>
   <kbd>botón derecho</kbd> + mouse gira lo que tenés · + ruedita lo inclina<br>
-  clic en la computadora para usarla · <kbd>Esc</kbd> levantarte<br>
+  clic en la computadora para usarla · <kbd>Ctrl</kbd>+<kbd>Espacio</kbd> levantarte<br>
   <kbd>T</kbd> acelerar o detener el tiempo · <kbd>R</kbd> leer una revista · <kbd>L</kbd> luces · <kbd>P</kbd> música · <kbd>M</kbd> sonido<br>
   <kbd>F</kbd> o doble clic derecho abre una cápsula · <kbd>X</kbd> manda a desechar lo que tenés o lo que mirás · <kbd>Z</kbd> lo trae de vuelta<br>
   apuntá a una pared con algo en la mano para pegarlo con velcro · <kbd>Shift</kbd>+clic lo suelta sin pegarlo
@@ -145,7 +145,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   botón derecho sobre un objeto lo gira (ruedita para inclinarlo)<br>
   arrastrá la carpeta · clic en una hoja la pasa · doble clic la levanta · ruedita la gira<br>
   clic en la pantalla: el mouse pasa a la computadora (<kbd>Esc</kbd> lo suelta)<br>
-  <kbd>Ctrl</kbd>+<kbd>mouse</kbd> orientar la vista · <kbd>Ctrl</kbd>+<kbd>ruedita</kbd> zoom · <kbd>botón del medio</kbd> pan · <kbd>Ctrl</kbd>+<kbd>botón del medio</kbd> centrar · <span id="escHelp"><kbd>Esc</kbd> levantarte</span>
+  <kbd>Ctrl</kbd>+<kbd>mouse</kbd> orientar la vista · <kbd>Ctrl</kbd>+<kbd>ruedita</kbd> zoom · <kbd>botón del medio</kbd> pan · <kbd>Ctrl</kbd>+<kbd>botón del medio</kbd> centrar · <span id="escHelp"><kbd>Ctrl</kbd>+<kbd>Espacio</kbd> levantarte</span>
 </div>
 <div class="hud" id="toast" hidden></div>
 <div id="comfortUI" class="cpanel" hidden>
@@ -240,7 +240,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <input id="videoFile" type="file" accept="video/*" multiple hidden>
 <input id="gameFile" type="file" accept=".zip,.jsdos,.exe,.com,.bat" hidden>
 <input id="musicFile" type="file" accept="audio/*" multiple hidden>
-<button id="leave" hidden>Levantarse (Esc)</button>
+<button id="leave" hidden>Levantarse (Ctrl+Espacio)</button>
 <div class="pad" id="pad" hidden>
   <button id="fwd">Avanzar</button>
   <button id="back">Retroceder</button>
@@ -266,7 +266,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <dt>Objetos</dt><dd>clic para agarrar y soltar, botón del medio para tirar</dd>
       <dt>Cápsulas</dt><dd>F o doble clic derecho para abrirlas</dd>
       <dt>Programar</dt><dd>clic en la computadora</dd>
-      <dt>Levantarse</dt><dd>Esc</dd>
+      <dt>Levantarse</dt><dd>Ctrl+Espacio</dd>
       <dt>Tiempo</dt><dd>T acelera la órbita ×30</dd>
       <dt>Música</dt><dd>la casetera, al fondo a la derecha (P)</dd>
       <dt>Desechar</dt><dd>X manda a desechar lo que tenés, Z lo trae de vuelta</dd>
@@ -4438,7 +4438,7 @@ const PC_LEEME = crlf([
   '',
   'Comandos: DIR CD MD COPY DEL REN TYPE MORE CLS MEM HELP',
   'ORBITA   vuelve a la ROM BASIC de la estacion',
-  'Mantene apretado Esc para levantarte de la silla.',
+  'Ctrl+Espacio te levanta de la silla.',
   ''
 ].join('\n'));
 // ORBITA.COM: muestra un mensaje y espera una tecla; mientras corre, la pantalla pasa a la ROM
@@ -4449,7 +4449,7 @@ const PC_LEEME2 = crlf([
   'Gemela de la estacion de enfrente, con su propio disco C:',
   'y su propia disquetera A:.',
   'La perilla del monitor cambia el tono del fosforo.',
-  'Mantene apretado Esc para levantarte.',
+  'Ctrl+Espacio te levanta de la silla.',
   ''
 ].join('\n'));
 const PC_CONF = [
@@ -4777,7 +4777,6 @@ function pcKey(P, e, down) {
 function pcReleaseAll(P) { if (P.ci) [...P.down].forEach((c) => pcSend(P, c, false)); P.escAt = 0; }
 
 function updatePC(P, dt) {
-  if (P.escAt && performance.now() - P.escAt > 650 && state === 'terminal' && cur === P.st) { pcReleaseAll(P); exitTerminal(); }
   if (P.ci && P.mode === 'pc') {
     P.pollT += dt;
     if (P.pollT > 0.7) {
@@ -4850,7 +4849,7 @@ function markLoaded() {
 loadedDisks.forEach((k) => { if (DISKS[k]) DISKS[k].loaded = true; });
 function updateTermHelp() {
   const el = $('escHelp');
-  if (el) el.innerHTML = cur.pc.mode === 'pc' ? 'mantené <kbd>Esc</kbd> para levantarte' : cur.pc.mode === 'c64' ? '<kbd>Esc</kbd> levantarte · <kbd>Tab</kbd> RUN/STOP' : '<kbd>Esc</kbd> levantarte';
+  if (el) el.innerHTML = '<kbd>Ctrl</kbd>+<kbd>Espacio</kbd> levantarte' + (cur.pc.mode === 'c64' ? ' · <kbd>Esc</kbd> RUN/STOP' : '');
 }
 updateTermHelp();
 
@@ -5590,11 +5589,12 @@ const hold = (id, k) => {
 hold('fwd', 'KeyW'); hold('back', 'KeyS');
 
 window.addEventListener('keydown', (e) => {
+  // Ctrl+Espacio te levanta de cualquier computadora; Esc queda para la computadora
+  if (state === 'terminal' && e.ctrlKey && e.code === 'Space') { e.preventDefault(); pcReleaseAll(cur.pc); exitTerminal(); return; }
   if (state === 'terminal' && e.key === 'Escape' && (mouseCap.on || performance.now() - mouseCap.endedAt < 400)) { e.preventDefault(); endMouseCap(); return; }
   if (state === 'terminal' && cur.pc.mode === 'c64') {
-    if (e.key === 'Escape') { e.preventDefault(); exitTerminal(); return; }
-    // Tab hace de RUN/STOP; lo demás va tal cual al teclado de la Commodore
-    if (cur.pc.c64 && cur.pc.c64.key(true, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key)) e.preventDefault();
+    // Esc es RUN/STOP; todo va tal cual al teclado de la Commodore
+    if (cur.pc.c64 && cur.pc.c64.key(true, e.code, e.key)) e.preventDefault();
     return;
   }
   if (state === 'terminal' && cur.pc.mode === 'pc') {
@@ -5655,7 +5655,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
   if (cur.pc.ci && (cur.pc.down.size || cur.pc.escAt)) pcKey(cur.pc, e, false);
-  if (cur.pc.c64 && cur.pc.mode === 'c64') cur.pc.c64.key(false, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key);
+  if (cur.pc.c64 && cur.pc.mode === 'c64') cur.pc.c64.key(false, e.code, e.key);
 });
 window.addEventListener('blur', () => STATIONS.forEach((st) => pcReleaseAll(st.pc)));
 typer.addEventListener('input', () => {

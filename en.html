@@ -134,7 +134,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   <kbd>W A S D</kbd> float · <kbd>Q</kbd> up · <kbd>E</kbd> down · <kbd>Shift</kbd> faster · <kbd>mouse</kbd> look around<br>
   click grabs and drops things · <kbd>middle button</kbd> throws it (hold for more force) · wheel moves it closer or farther<br>
   <kbd>right button</kbd> + mouse turns what you hold · + scroll wheel tilts it<br>
-  click the computer to use it · <kbd>Esc</kbd> get up<br>
+  click the computer to use it · <kbd>Ctrl</kbd>+<kbd>Space</kbd> get up<br>
   <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine · <kbd>L</kbd> lights · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
   <kbd>F</kbd> or right double-click opens a capsule · <kbd>X</kbd> discards what you hold or look at · <kbd>Z</kbd> brings it back<br>
   aim at a wall with something in hand to stick it with velcro · <kbd>Shift</kbd>+click drops it without sticking
@@ -145,7 +145,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   right-click an object to turn it (scroll wheel to tilt it)<br>
   drag the binder · click a page to turn it · double-click picks it up · scroll wheel turns it<br>
   click the screen: the mouse goes to the computer (<kbd>Esc</kbd> releases it)<br>
-  <kbd>Ctrl</kbd>+<kbd>mouse</kbd> look around · <kbd>Ctrl</kbd>+<kbd>scroll wheel</kbd> zoom · <kbd>middle button</kbd> pan · <kbd>Ctrl</kbd>+<kbd>middle button</kbd> center · <span id="escHelp"><kbd>Esc</kbd> get up</span>
+  <kbd>Ctrl</kbd>+<kbd>mouse</kbd> look around · <kbd>Ctrl</kbd>+<kbd>scroll wheel</kbd> zoom · <kbd>middle button</kbd> pan · <kbd>Ctrl</kbd>+<kbd>middle button</kbd> center · <span id="escHelp"><kbd>Ctrl</kbd>+<kbd>Space</kbd> get up</span>
 </div>
 <div class="hud" id="toast" hidden></div>
 <div id="comfortUI" class="cpanel" hidden>
@@ -240,7 +240,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <input id="videoFile" type="file" accept="video/*" multiple hidden>
 <input id="gameFile" type="file" accept=".zip,.jsdos,.exe,.com,.bat" hidden>
 <input id="musicFile" type="file" accept="audio/*" multiple hidden>
-<button id="leave" hidden>Get up (Esc)</button>
+<button id="leave" hidden>Get up (Ctrl+Space)</button>
 <div class="pad" id="pad" hidden>
   <button id="fwd">Forward</button>
   <button id="back">Back</button>
@@ -266,7 +266,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <dt>Objects</dt><dd>click to grab and drop, middle button to throw</dd>
       <dt>Capsules</dt><dd>F or right double-click opens them</dd>
       <dt>Program</dt><dd>click the computer</dd>
-      <dt>Get up</dt><dd>Esc</dd>
+      <dt>Get up</dt><dd>Ctrl+Space</dd>
       <dt>Time</dt><dd>T speeds up the orbit ×30</dd>
       <dt>Music</dt><dd>the cassette deck, at the back on the right (P)</dd>
       <dt>Discard</dt><dd>X discards what you hold, Z brings it back</dd>
@@ -4438,7 +4438,7 @@ const PC_LEEME = crlf([
   '',
   'Commands: DIR CD MD COPY DEL REN TYPE MORE CLS MEM HELP',
   'ORBITA   returns to the station\'s ROM BASIC',
-  'Hold Esc to get up from the chair.',
+  'Ctrl+Space gets you up from the chair.',
   ''
 ].join('\n'));
 // ORBITA.COM: muestra un mensaje y espera una tecla; mientras corre, la pantalla pasa a la ROM
@@ -4449,7 +4449,7 @@ const PC_LEEME2 = crlf([
   'Twin of the station across the way, with its own C: disk',
   'and its own A: floppy drive.',
   'The monitor knob changes the phosphor color.',
-  'Hold Esc to get up.',
+  'Ctrl+Space gets you up from the chair.',
   ''
 ].join('\n'));
 const PC_CONF = [
@@ -4777,7 +4777,6 @@ function pcKey(P, e, down) {
 function pcReleaseAll(P) { if (P.ci) [...P.down].forEach((c) => pcSend(P, c, false)); P.escAt = 0; }
 
 function updatePC(P, dt) {
-  if (P.escAt && performance.now() - P.escAt > 650 && state === 'terminal' && cur === P.st) { pcReleaseAll(P); exitTerminal(); }
   if (P.ci && P.mode === 'pc') {
     P.pollT += dt;
     if (P.pollT > 0.7) {
@@ -4850,7 +4849,7 @@ function markLoaded() {
 loadedDisks.forEach((k) => { if (DISKS[k]) DISKS[k].loaded = true; });
 function updateTermHelp() {
   const el = $('escHelp');
-  if (el) el.innerHTML = cur.pc.mode === 'pc' ? 'hold <kbd>Esc</kbd> to get up' : cur.pc.mode === 'c64' ? '<kbd>Esc</kbd> get up · <kbd>Tab</kbd> RUN/STOP' : '<kbd>Esc</kbd> get up';
+  if (el) el.innerHTML = '<kbd>Ctrl</kbd>+<kbd>Space</kbd> get up' + (cur.pc.mode === 'c64' ? ' · <kbd>Esc</kbd> RUN/STOP' : '');
 }
 updateTermHelp();
 
@@ -5590,11 +5589,12 @@ const hold = (id, k) => {
 hold('fwd', 'KeyW'); hold('back', 'KeyS');
 
 window.addEventListener('keydown', (e) => {
+  // Ctrl+Espacio te levanta de cualquier computadora; Esc queda para la computadora
+  if (state === 'terminal' && e.ctrlKey && e.code === 'Space') { e.preventDefault(); pcReleaseAll(cur.pc); exitTerminal(); return; }
   if (state === 'terminal' && e.key === 'Escape' && (mouseCap.on || performance.now() - mouseCap.endedAt < 400)) { e.preventDefault(); endMouseCap(); return; }
   if (state === 'terminal' && cur.pc.mode === 'c64') {
-    if (e.key === 'Escape') { e.preventDefault(); exitTerminal(); return; }
-    // Tab hace de RUN/STOP; lo demás va tal cual al teclado de la Commodore
-    if (cur.pc.c64 && cur.pc.c64.key(true, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key)) e.preventDefault();
+    // Esc es RUN/STOP; todo va tal cual al teclado de la Commodore
+    if (cur.pc.c64 && cur.pc.c64.key(true, e.code, e.key)) e.preventDefault();
     return;
   }
   if (state === 'terminal' && cur.pc.mode === 'pc') {
@@ -5655,7 +5655,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
   if (cur.pc.ci && (cur.pc.down.size || cur.pc.escAt)) pcKey(cur.pc, e, false);
-  if (cur.pc.c64 && cur.pc.mode === 'c64') cur.pc.c64.key(false, e.code === 'Tab' ? 'Escape' : e.code, e.code === 'Tab' ? 'Escape' : e.key);
+  if (cur.pc.c64 && cur.pc.mode === 'c64') cur.pc.c64.key(false, e.code, e.key);
 });
 window.addEventListener('blur', () => STATIONS.forEach((st) => pcReleaseAll(st.pc)));
 typer.addEventListener('input', () => {
