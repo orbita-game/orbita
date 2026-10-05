@@ -235,7 +235,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     </div>
     <div class="partida">
       <p>El curso de la partida se guarda en este navegador. Si cambiás de navegador o borrás el historial, la partida empieza de nuevo. Cada partida es única: a ningún jugador le toca necesariamente el mismo contenido.</p>
-      <div class="row"><button type="button" id="saveFile">Guardar la partida en un archivo</button><button type="button" id="loadFile">Cargar una partida</button></div>
+      <div class="row"><button type="button" id="saveFile">Guardar la partida en un archivo</button><button type="button" id="loadFile">Cargar una partida</button><button type="button" id="loadStart">Empezar desde la partida de ejemplo</button></div>
       <input type="file" id="loadInput" accept=".json,application/json" hidden>
     </div>
     <p class="aviso">Aviso: los restos son materiales reales de cada época (revistas, películas, música, afiches, fotos y programas) que llegan al azar desde archivos públicos como archive.org y Wikimedia Commons. No se revisan uno por uno, así que pueden incluir desnudos, violencia, lenguaje fuerte u otro contenido para adultos. Pensado para mayores de 18 años. Cada material pertenece a sus autores y no expresa la opinión de quien hizo el juego.</p>
@@ -4497,12 +4497,11 @@ async function exportGame() {
     msg.textContent = 'Partida guardada en ' + name + '.';
   } catch (e) { console.warn('exportar', e); msg.textContent = 'No pude guardar la partida en un archivo.'; }
 }
-async function importGame(file) {
+async function importGame(file, data = null) {
   const msg = $('progress');
-  let data = null;
-  try { data = JSON.parse(await file.text()); } catch (e) {}
+  if (file) try { data = JSON.parse(await file.text()); } catch (e) {}
   if (!data || data.juego !== 'orbita' || !data.ls || typeof data.ls !== 'object') { msg.textContent = 'Ese archivo no es una partida de Órbita.'; return; }
-  if (!confirm('La partida del archivo reemplaza la que tenés en este navegador. ¿Seguir?')) return;
+  if (!confirm((file ? 'La partida del archivo' : 'La partida de ejemplo') + ' reemplaza la que tenés en este navegador. ¿Seguir?')) return;
   msg.textContent = 'Cargando la partida…';
   try {
     store.frozen = true; idb.freeze();
@@ -4516,6 +4515,13 @@ async function importGame(file) {
 }
 $('saveFile').addEventListener('click', exportGame);
 $('loadFile').addEventListener('click', () => $('loadInput').click());
+// partida armada de antemano, con restos ya juntados, que viaja junto al juego
+$('loadStart').addEventListener('click', async () => {
+  let data = null;
+  try { const r = await fetch('partidas/ejemplo.json', { cache: 'no-cache' }); if (r.ok) data = await r.json(); } catch (e) {}
+  if (!data) { $('progress').textContent = 'No encontré la partida de ejemplo (partidas/ejemplo.json).'; return; }
+  importGame(null, data);
+});
 $('loadInput').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importGame(f); });
 $('enter').addEventListener('click', () => {
   startAudio();

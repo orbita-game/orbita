@@ -235,7 +235,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     </div>
     <div class="partida">
       <p>Your game is saved in this browser. If you switch browsers or clear your history, the game starts over. Every game is unique: no two players necessarily get the same content.</p>
-      <div class="row"><button type="button" id="saveFile">Save the game to a file</button><button type="button" id="loadFile">Load a game</button></div>
+      <div class="row"><button type="button" id="saveFile">Save the game to a file</button><button type="button" id="loadFile">Load a game</button><button type="button" id="loadStart">Start from the sample save</button></div>
       <input type="file" id="loadInput" accept=".json,application/json" hidden>
     </div>
     <p class="aviso">Notice: salvage items are real period materials (magazines, films, music, posters, photos and software) that arrive at random from public archives such as archive.org and Wikimedia Commons. They are not reviewed one by one, so they may include nudity, violence, strong language or other adult content. Intended for ages 18+. Each item belongs to its authors and does not reflect the views of the game's creator.</p>
@@ -4497,12 +4497,11 @@ async function exportGame() {
     msg.textContent = 'Game saved to ' + name + '.';
   } catch (e) { console.warn('exportar', e); msg.textContent = 'Couldn\'t save the game to a file.'; }
 }
-async function importGame(file) {
+async function importGame(file, data = null) {
   const msg = $('progress');
-  let data = null;
-  try { data = JSON.parse(await file.text()); } catch (e) {}
+  if (file) try { data = JSON.parse(await file.text()); } catch (e) {}
   if (!data || data.juego !== 'orbita' || !data.ls || typeof data.ls !== 'object') { msg.textContent = 'That file isn\'t an Órbita save.'; return; }
-  if (!confirm('The game in the file replaces the one in this browser. Continue?')) return;
+  if (!confirm((file ? 'The save in that file' : 'The sample save') + ' replaces the one in this browser. Continue?')) return;
   msg.textContent = 'Loading the game…';
   try {
     store.frozen = true; idb.freeze();
@@ -4516,6 +4515,13 @@ async function importGame(file) {
 }
 $('saveFile').addEventListener('click', exportGame);
 $('loadFile').addEventListener('click', () => $('loadInput').click());
+// partida armada de antemano, con restos ya juntados, que viaja junto al juego
+$('loadStart').addEventListener('click', async () => {
+  let data = null;
+  try { const r = await fetch('partidas/ejemplo.json', { cache: 'no-cache' }); if (r.ok) data = await r.json(); } catch (e) {}
+  if (!data) { $('progress').textContent = 'Could not find the sample save (partidas/ejemplo.json).'; return; }
+  importGame(null, data);
+});
 $('loadInput').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importGame(f); });
 $('enter').addEventListener('click', () => {
   startAudio();
