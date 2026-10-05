@@ -1490,7 +1490,7 @@ function makeVhsMesh(label, coverUrl) {
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.025, 0.104), [side, side, face, side, side, side]);
   g.add(body);
   // si hay imagen de la película, el VHS llega en su caja de cartón con esa tapa
-  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => {
+  if (coverUrl) loadImageTex(coverUrls(coverUrl)).then((t) => {
     const img = t.image;
     if (!img || img.width < 80 || img.height < 80) { t.dispose(); return; }
     const W = 280, H = 512, IH = 446;
@@ -1777,7 +1777,7 @@ function makeGameBoxMesh(name, year, kind, coverUrl) {
   body.position.y = T / 2; g.add(body);
   // la tapa de archive.org es una imagen de la primera página; su servidor no deja usarla como textura,
   // así que si falla directo se pide a través de wsrv.nl (que sí lo permite). No baja el PDF.
-  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
+  if (coverUrl) loadImageTex(coverUrls(coverUrl)).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
   return g;
 }
 
@@ -1796,7 +1796,7 @@ function makeMagazineMesh2(drawCover, coverUrl) {
   g.userData.coverMat = coverMat;
   // la tapa de archive.org es una imagen de la primera página; su servidor no deja usarla como textura,
   // así que si falla directo se pide a través de wsrv.nl (que sí lo permite). No baja el PDF.
-  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
+  if (coverUrl) loadImageTex(coverUrls(coverUrl)).then((t) => { if (coverMat.map) coverMat.map.dispose(); coverMat.map = t; coverMat.needsUpdate = true; }).catch(() => {});
   return g;
 }
 function drawMagCover(name, year) {
@@ -2005,7 +2005,7 @@ async function loadManifest() {
   manifestLoaded = count > 0;
   userLinks.forEach((l) => registerEntry(l.year, l.cat, l));
   // lo que había llegado de los temas que ya no se traen, deja de estar
-  SALV.aoEntries.forEach((l) => { if (!avoided(l.nombre) && !avoided(l.url)) registerEntry(l.year, l.cat, l); });
+  SALV.aoEntries.forEach((l) => { if (!avoided(l.nombre) && !avoided(l.url) && !offEra(l.nombre)) registerEntry(l.year, l.cat, l); });
   (SALV.gens || []).forEach((g) => genDecor(g.year, g.n));
   (SALV.mine || []).forEach(registerMine);
   return manifestLoaded;
@@ -2020,18 +2020,33 @@ function drawPosterTitle(name, msg) {
   };
 }
 // una imagen de otro sitio: directo, desde el servidor de archive.org, o por un intermediario que agrega el permiso
+// de a pocas a la vez: con cientos de tapas juntas los servidores cortan y no llega ninguna
+const IMG_Q = { n: 0, wait: [] };
+function imgSlot() { return IMG_Q.n < 4 ? (IMG_Q.n++, Promise.resolve()) : new Promise((r) => IMG_Q.wait.push(r)); }
+function imgFree() { const nx = IMG_Q.wait.shift(); if (nx) nx(); else IMG_Q.n--; }
 function loadImageTex(urls) {
+  if (!urls.some((u) => /^https?:/i.test(u))) return loadImageTex1(urls);
+  return imgSlot().then(() => loadImageTex1(urls).finally(imgFree));
+}
+function loadImageTex1(urls) {
   return new Promise((res, rej) => {
     const tryAt = (i) => {
       if (i >= urls.length) return rej(new Error('ninguna dirección sirvió'));
       const img = new Image(); img.crossOrigin = 'anonymous'; img.decoding = 'async';
-      const tm = setTimeout(() => { img.src = ''; tryAt(i + 1); }, 20000);
+      const tm = setTimeout(() => { img.src = ''; tryAt(i + 1); }, 12000);
       img.onload = () => { clearTimeout(tm); if (!img.naturalWidth) return tryAt(i + 1); const t = new THREE.Texture(img); t.needsUpdate = true; res(t); };
       img.onerror = () => { clearTimeout(tm); tryAt(i + 1); };
       img.src = urls[i];
     };
     tryAt(0);
   });
+}
+// tapas: la miniatura de archive.org primero desde /download/ (que manda CORS), después services/img y wsrv.nl
+function coverUrls(u) {
+  if (!/^https?:/i.test(u)) return [u];
+  const m = /archive\.org\/services\/img\/([^/?#]+)/.exec(u);
+  if (!m) return [u, viaProxy(u)];
+  return ['https://archive.org/download/' + m[1] + '/__ia_thumb.jpg', u, viaProxy(u), viaProxy('https://archive.org/download/' + m[1] + '/__ia_thumb.jpg')];
 }
 function viaProxy(u) { return 'https://wsrv.nl/?w=1024&h=1024&fit=inside&url=' + encodeURIComponent(u.replace(/^https?:\/\//, '')); }
 async function imageUrls(src) {
@@ -2471,6 +2486,8 @@ const AO_RANDOM = { on: store.get('orbita.aoRandom', true), pais: store.get('orb
 const AVOID_WORDS = ['nazi', 'nazis', 'hitler', 'holocaust', 'fascist', 'fascism', 'communist', 'communism', 'socialist', 'socialism', 'marxist', 'propaganda', 'racist', 'racism', 'racial', 'segregation', 'apartheid', 'slavery', 'supremacist', 'supremacy', 'ku klux', 'kkk', 'white power', 'black power', 'black panther', 'civil rights', 'race relations', 'politics', 'political', 'election', 'campaign', 'protest', 'riot', 'dictatorship', 'genocide', 'extremist', 'nationalist', 'swastika', 'third reich', 'neo-nazi', 'skinhead', 'terrorism', 'immigration', 'gestapo', 'waffen', 'she wolf of', 'white right', 'army soldiers'];
 const AVOID_RE = new RegExp('\\b(' + AVOID_WORDS.concat(['nazismo', 'fascismo', 'comunismo', 'comunista', 'socialismo', 'racismo', 'racista', 'política', 'politica', 'político', 'elecciones', 'dictadura', 'militancia', 'propaganda', 'derechos civiles', 'protesta', 'golpe de estado']).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')s?\\b', 'i');
 const avoided = (t) => AVOID_RE.test(String(t || ''));
+// todo tiene que ser de los 80 y los 90: un título que nombra otro año ("1933", "2004") no entra
+const offEra = (t) => (String(t || '').match(/(?<![\d.\/-])(19\d\d|20[0-2]\d)(?![\d])/g) || []).some((y) => +y < 1980 || +y > 1999);
 const AO_AVOID = ' AND NOT (' + AVOID_WORDS.map((w) => /\s/.test(w) ? '"' + w + '"' : w).map((w) => 'subject:' + w + ' OR title:' + w).join(' OR ') + ')';
 const COMMONS_AVOID = ' ' + AVOID_WORDS.filter((w) => !/\s/.test(w)).map((w) => '-' + w).join(' ');
 const AO_Q = {
@@ -2519,7 +2536,7 @@ async function aoRandomItem(year, cat, best, paisK) {
       if (!doc || SALV.aoSeen.includes(doc.identifier)) continue;
       // nada repetido: ni el mismo ítem ni otro con el mismo título
       const t0 = Array.isArray(doc.title) ? doc.title[0] : doc.title;
-      if (avoided(t0) || avoided(doc.identifier) || avoided([].concat(doc.subject || []).join(' '))) { SALV.aoSeen.push(doc.identifier); continue; }
+      if (avoided(t0) || offEra(t0) || avoided(doc.identifier) || avoided([].concat(doc.subject || []).join(' '))) { SALV.aoSeen.push(doc.identifier); continue; }
       const tk = titleKey(t0 || doc.identifier);
       if (SALV.aoTitles.includes(tk) || [...CATALOG.values()].some((x) => x.tkey === tk)) { SALV.aoSeen.push(doc.identifier); continue; }
       // la música llega como discos o casetes completos, no temas sueltos
@@ -2553,7 +2570,7 @@ async function commonsDecor(year, carteles, paisK) {
     for (let tries = 0; tries < 8 && pages.length; tries++) {
       const p = pages.splice(Math.floor(Math.random() * pages.length), 1)[0], ii = p.imageinfo[0];
       const nombre = p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/[_\s]+/g, ' ').slice(0, 44);
-      if (avoided(p.title)) continue;
+      if (avoided(p.title) || offEra(p.title)) continue;
       const tk = titleKey(nombre);
       if (SALV.aoSeen.includes(ii.thumburl) || SALV.aoTitles.includes(tk)) continue;
       SALV.aoSeen.push(ii.thumburl); SALV.aoTitles.push(tk);
