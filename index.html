@@ -107,6 +107,8 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .card .partida button { font: 12px var(--mono); color: var(--hull); background: rgba(10, 14, 22, 0.8); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
 .card .partida button.danger { border-color: rgba(255, 120, 90, 0.45); color: #f0b0a0; }
 .card .partida button:hover, .card .partida button:focus-visible { border-color: var(--hull); outline: none; }
+.card .entiendo { display: flex; gap: 8px; align-items: center; margin: -6px 0 0 12px; font-size: 12px; color: var(--hull); cursor: pointer; }
+.card .entiendo input { accent-color: var(--phosphor); width: 16px; height: 16px; }
 .card .truco { margin: 0; font-size: 11px; font-style: italic; color: var(--dim); }
 .card .truco b { font-weight: 400; color: var(--hull); letter-spacing: 0.08em; }
 #progress { font-size: 12px; color: var(--signal); font-variant-numeric: tabular-nums; min-height: 1.4em; }
@@ -285,13 +287,14 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <input type="file" id="loadInput" accept=".json,application/json" hidden>
     </div>
         <p class="aviso">Aviso: los restos son materiales reales de cada época (revistas, películas, música, afiches, fotos y programas) que llegan al azar desde archivos públicos como archive.org y Wikimedia Commons. No se revisan uno por uno, así que pueden incluir desnudos, violencia, lenguaje fuerte u otro contenido para adultos. Pensado para mayores de 18 años. Cada material pertenece a sus autores y no expresa la opinión de quien hizo el juego.</p>
+        <label class="entiendo"><input type="checkbox" id="avisoOk"> Entiendo</label>
       </div>
     </div>
     <div class="go">
       <button class="btn" id="enter" disabled>Entrar al módulo</button>
       <div id="progress">Generando la Tierra…</div>
     </div>
-    <p class="truco">* <b>IDDQD</b>: para ser invencible en DOOM y para forzar los envíos en Órbita.</p>
+    <p class="truco">* <b>IDDQD</b>: para ser invencible en DOOM y para forzar los envíos en Órbita. <b>IDKFA</b>: trae un satélite entero para acoplar.</p>
   </div>
 </div>
 
@@ -488,15 +491,29 @@ const earthSpin = new THREE.Group();
 earthPivot.add(earthSpin);
 const earthUniforms = { dayTex: { value: null }, nightTex: { value: null }, heightTex: { value: null }, cloudTex: { value: null }, waterTex: { value: null }, useWater: { value: 0 }, hTexel: { value: new THREE.Vector2(1 / 2048, 1 / 1024) }, bump: { value: 3.0 }, cloudShift: { value: 0 }, sunDir: { value: sunDir } };
 const cloudUniforms = { cloudTex: { value: null }, sunDir: { value: sunDir } };
+// ruido de valor 3D para el detalle fino (lo que la foto de la NASA no alcanza a mostrar de cerca)
+const glslNoise = `
+  float hsh(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float vnoise(vec3 x){
+    vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hsh(i), hsh(i + vec3(1,0,0)), f.x), mix(hsh(i + vec3(0,1,0)), hsh(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(hsh(i + vec3(0,0,1)), hsh(i + vec3(1,0,1)), f.x), mix(hsh(i + vec3(0,1,1)), hsh(i + vec3(1,1,1)), f.x), f.y), f.z);
+  }
+  // fbm que se apaga solo cuando la frecuencia es más fina que un píxel (sin titileo de lejos)
+  float dfbm(vec3 p, float fw){
+    float s = 0.0, a = 0.5, n = 0.0;
+    for (int k = 0; k < 5; k++) { float fade = clamp(1.5 - fw * 2.0, 0.0, 1.0); s += a * fade * (vnoise(p) - 0.5); n += a; p = mat3(0.00, 0.80, 0.60, -0.80, 0.36, -0.48, -0.60, -0.48, 0.64) * p * 2.07 + 3.1; fw *= 2.07; a *= 0.5; }
+    return s / n;
+  }`;
 const vsWorld = `
-  varying vec3 vN; varying vec3 vW; varying vec2 vUv;
-  void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vP;
+  void main(){ vUv = uv; vP = normalize(position); vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
 const earthMat = new THREE.ShaderMaterial({
-  uniforms: earthUniforms,
+  uniforms: earthUniforms, extensions: { derivatives: true },
   vertexShader: `
-  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vE; varying vec3 vNo;
+  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vE; varying vec3 vNo; varying vec3 vP;
   void main(){
-    vUv = uv;
+    vUv = uv; vP = normalize(position);
     vec3 n = normalize(normal);
     vec3 e = normalize(vec3(-n.z, 0.0, n.x) + vec3(0.0001));
     vN = normalize(mat3(modelMatrix) * n);
@@ -509,7 +526,15 @@ const earthMat = new THREE.ShaderMaterial({
   uniform sampler2D dayTex; uniform sampler2D nightTex; uniform sampler2D heightTex; uniform sampler2D cloudTex; uniform sampler2D waterTex;
   uniform float useWater; uniform vec2 hTexel; uniform float bump;
   uniform float cloudShift; uniform vec3 sunDir;
-  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vE; varying vec3 vNo;
+  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vE; varying vec3 vNo; varying vec3 vP;
+  ${glslNoise}
+  // relieve a partir de una altura que solo existe en el shader (derivadas de pantalla)
+  vec3 bumpN(vec3 N, float h, float k){
+    vec3 dpx = dFdx(vW), dpy = dFdy(vW); float dhx = dFdx(h), dhy = dFdy(h);
+    vec3 r1 = cross(dpy, N), r2 = cross(N, dpx); float det = dot(dpx, r1);
+    vec3 g = sign(det) * (dhx * r1 + dhy * r2);
+    return normalize(abs(det) * N - g * k);
+  }
   void main(){
     vec3 v = normalize(cameraPosition - vW);
     float h0 = texture2D(heightTex, vUv).r;
@@ -517,18 +542,32 @@ const earthMat = new THREE.ShaderMaterial({
     float hy = texture2D(heightTex, vUv + vec2(0.0, hTexel.y)).r - h0;
     vec3 n = normalize(normalize(vN) - (vE * hx + vNo * hy) * bump);
     vec3 ng = normalize(vN);
+    vec3 tex = texture2D(dayTex, vUv).rgb;
+    float ocean = useWater > 0.5 ? texture2D(waterTex, vUv).r : smoothstep(0.02, 0.1, tex.b - tex.r);
+    float land = 1.0 - ocean;
+    // detalle fino: valles, sierras y manchas de suelo y vegetación más chicas que un píxel de la foto
+    float fw = length(fwidth(vP));
+    float dl = dfbm(vP * 90.0, fw * 90.0), ds = dfbm(vP * 700.0 + 7.0, fw * 700.0);
+    float relief = h0 * 1.4 + 0.25;
+    tex *= 1.0 + land * (dl * 0.4 + ds * 0.3);
+    tex = mix(tex, tex * vec3(1.06, 1.0, 0.92), land * smoothstep(0.0, 0.25, dl)); // suelo más seco en las lomas
+    float lum = dot(tex, vec3(0.3, 0.59, 0.11));
+    tex = max(mix(vec3(lum), tex, 1.15), 0.0); // un poco más de color, la foto viene lavada
+    n = bumpN(n, (dl * 0.8 + ds * 0.35) * relief * land, 0.6);
+    // el mar: olas largas que rompen el reflejo del sol en brillos
+    float wv = dfbm(vP * 260.0 + vec3(0.0, cloudShift * 40.0, 0.0), fw * 260.0) + dfbm(vP * 1400.0, fw * 1400.0) * 0.5;
+    vec3 nw = bumpN(ng, wv * ocean, 0.05);
     float d = dot(n, sunDir), dg = dot(ng, sunDir);
     float day = smoothstep(-0.1, 0.2, dg);
-    vec3 tex = texture2D(dayTex, vUv).rgb;
     float shadow = 1.0 - texture2D(cloudTex, vUv - vec2(cloudShift, 0.0) + sunDir.xz * 0.0015).r * 0.45;
     vec3 dayC = tex * (0.08 + 1.1 * max(d, 0.0)) * shadow;
     vec3 night = texture2D(nightTex, vUv).rgb;
     vec3 nightC = night * 1.25 * smoothstep(0.05, -0.2, dg) + tex * 0.012;
     vec3 col = mix(nightC, dayC, day);
-    float ocean = useWater > 0.5 ? texture2D(waterTex, vUv).r : smoothstep(0.02, 0.1, tex.b - tex.r);
     vec3 hv = normalize(sunDir + v);
     float fres = pow(1.0 - max(dot(ng, v), 0.0), 5.0);
-    col += vec3(1.0, 0.9, 0.75) * (pow(max(dot(ng, hv), 0.0), 90.0) * 1.2 + fres * 0.25) * ocean * day;
+    float nh = max(dot(nw, hv), 0.0);
+    col += vec3(1.0, 0.9, 0.75) * (pow(nh, 90.0) * 1.1 + pow(nh, 600.0) * 1.2 + fres * 0.25) * ocean * day * shadow;
     col += vec3(0.6, 0.28, 0.1) * exp(-pow(dg * 10.0, 2.0)) * 0.12;
     float rim = pow(1.0 - max(dot(ng, v), 0.0), 2.2);
     vec3 haze = mix(vec3(0.9, 0.45, 0.2), vec3(0.35, 0.6, 1.0), smoothstep(-0.05, 0.35, dg));
@@ -539,12 +578,16 @@ const earthMat = new THREE.ShaderMaterial({
 const earth = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 192, 128), earthMat);
 earthSpin.add(earth);
 const clouds = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.006, 192, 128), new THREE.ShaderMaterial({
-  uniforms: cloudUniforms, vertexShader: vsWorld, transparent: true, depthWrite: false,
+  uniforms: cloudUniforms, vertexShader: vsWorld, transparent: true, depthWrite: false, extensions: { derivatives: true },
   fragmentShader: `
   uniform sampler2D cloudTex; uniform vec3 sunDir;
-  varying vec3 vN; varying vec3 vW; varying vec2 vUv;
+  varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vP;
+  ${glslNoise}
   void main(){
     float a = texture2D(cloudTex, vUv).r;
+    // bordes deshilachados y cúmulos chicos donde la foto es una mancha
+    float fw = length(fwidth(vP)), cn = dfbm(vP * 160.0, fw * 160.0) + dfbm(vP * 900.0, fw * 900.0) * 0.5;
+    a = clamp(a + cn * 0.9 * a * (1.4 - a), 0.0, 1.0);
     vec3 n = normalize(vN); vec3 v = normalize(cameraPosition - vW);
     float d = dot(n, sunDir);
     float day = smoothstep(-0.1, 0.25, d);
@@ -581,9 +624,9 @@ function canvasTex(w, h, draw, rx, ry) {
   t.anisotropy = 4;
   return t;
 }
-function hullPanel(seed) {
+function hullPanel(seed, base = '#2b3036') {
   return canvasTex(256, 256, (x, w, h) => {
-    x.fillStyle = '#2b3036'; x.fillRect(0, 0, w, h);
+    x.fillStyle = base; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 1600; i++) { x.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${Math.random() * 0.045})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
     x.strokeStyle = 'rgba(8,10,12,0.95)'; x.lineWidth = 4; x.strokeRect(2, 2, w - 4, h - 4);
     x.strokeStyle = 'rgba(255,255,255,0.07)'; x.lineWidth = 1; x.strokeRect(8, 8, w - 16, h - 16);
@@ -687,6 +730,7 @@ function octShape(r) {
   return s;
 }
 const R_OUT = POD.A / Math.cos(Math.PI / 8) + 0.1;
+const FRONT = {}; // la ventana de adelante: se tapa cuando hay un módulo acoplado
 {
   const s = octShape(R_OUT);
   const hole = new THREE.Path(); hole.absarc(0, 0, 1.55, 0, Math.PI * 2, true); s.holes.push(hole);
@@ -696,8 +740,8 @@ const R_OUT = POD.A / Math.cos(Math.PI / 8) + 0.1;
   ringM.position.set(0, POD.C, POD.z0); ringM.castShadow = true; scene.add(ringM);
   const glowRing = new THREE.Mesh(new THREE.TorusGeometry(1.66, 0.012, 6, 64), matGlow);
   glowRing.position.set(0, POD.C, POD.z0 + 0.02); scene.add(glowRing);
-  const mull = box(0.07, 3.1, 0.07, matFrame, 0, POD.C, POD.z0); mull.castShadow = true;
-  const mull2 = box(3.1, 0.07, 0.07, matFrame, 0, POD.C - 0.35, POD.z0);
+  FRONT.mull = box(0.07, 3.1, 0.07, matFrame, 0, POD.C, POD.z0); FRONT.mull.castShadow = true;
+  FRONT.mull2 = box(3.1, 0.07, 0.07, matFrame, 0, POD.C - 0.35, POD.z0);
 }
 /* esclusa doble al fondo: escotilla interior, cámara y compuerta exterior */
 const HATCH = { y: 1.25, r: 0.8, open: false, t: 0, outerT: 0, expelUntil: 0 };
@@ -836,11 +880,26 @@ function addItem(id, kind, g, pos, opts = {}) {
   g.position.copy(pos);
   if (opts.rot) g.rotation.set(...opts.rot);
   if (saved && saved.p) { g.position.fromArray(saved.p); if (saved.q) g.quaternion.fromArray(saved.q); it.inDrive = saved.d || 0; it.opened = !!saved.o; it.stuck = !!saved.s; }
+  // cada objeto dibuja sus caras un poquito corrido en profundidad: dos cajas que se tocan o se meten una en otra
+  // ya no parpadean (z-fighting) porque nunca quedan exactamente a la misma profundidad
+  g.userData.po = -1 - (items.length % 24) * 1.5;
   g.traverse((m) => { if (m.isMesh) { itemByMesh.set(m, it); itemMeshes.push(m); m.castShadow = true; m.receiveShadow = true; } });
+  applyItemOffset(g);
   scene.add(g);
   items.push(it);
   if (it.stuck) layerStuck(it);
   return it;
+}
+// se vuelve a llamar cuando un objeto cambia de materiales (la caja del VHS, el marco de un cuadro)
+function applyItemOffset(g) {
+  const po = g.userData.po; if (po == null) return;
+  g.traverse((m) => {
+    if (!m.isMesh) return;
+    (Array.isArray(m.material) ? m.material : [m.material]).forEach((mt) => {
+      if (!mt || (mt.blending === THREE.NoBlending && mt.opacity === 0)) return; // el agujero de los pósters sin CORS
+      mt.polygonOffset = true; mt.polygonOffsetFactor = po * 0.05; mt.polygonOffsetUnits = po;
+    });
+  });
 }
 // dos cosas pegadas en el mismo lugar y a la misma altura parpadean (z-fighting):
 // la última que se pega queda medio centímetro por delante de lo que se superpone con ella
@@ -895,7 +954,7 @@ function constrainPoint(p, v, r, bounce = 0.3) {
       if (vn > 0) { v.x -= (1 + bounce) * vn * n.x; v.y -= (1 + bounce) * vn * n.y; }
     }
   }
-  if (p.z < POD.z0 + 0.1 + r) { p.z = POD.z0 + 0.1 + r; v.z = Math.abs(v.z) * bounce; }
+  frontLimit(p, v, r, 0.1, bounce);
   if (!hatchPass && p.z > POD.z1 - 0.1 - r) { p.z = POD.z1 - 0.1 - r; v.z = -Math.abs(v.z) * bounce; }
   // escritorio y gabinete de la computadora
   if (p.z > CON.z0 && p.z < CON.z1 && p.x > CON.x0 - r) {
@@ -1456,7 +1515,7 @@ function makeVhsMesh(label, coverUrl) {
     // la caja va parada: el lado largo es el de arriba a abajo, como la tapa (en una pared, -z es arriba)
     body.geometry = new THREE.BoxGeometry(0.112, 0.032, 0.2);
     body.material = [spineMat, spineMat, new THREE.MeshStandardMaterial({ map: front, roughness: 0.45 }), card, card, card];
-    t.dispose(); g.userData.sleeve = true;
+    t.dispose(); g.userData.sleeve = true; applyItemOffset(g);
   }).catch(() => {});
   return g;
 }
@@ -1483,20 +1542,73 @@ function makeBallMesh() {
 }
 /* ---------- decoración: posters, cuadros y colgantes ---------- */
 // los objetos planos se arman acostados (cara hacia +Y, borde superior hacia -Z), así se pegan derechos
-function makePosterMesh(draw, w, h, framed) {
+// framed: false (póster), un estilo de FRAME_STYLES, o true (el marco que le toque por su tamaño)
+function makePosterMesh(draw, w, h, framed, id) {
   const g = new THREE.Group();
   const t = canvasTex(Math.round(512 * w / Math.max(w, h)), Math.round(512 * h / Math.max(w, h)), draw);
   const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, roughness: framed ? 0.4 : 0.85 }));
   face.rotation.x = -Math.PI / 2; face.position.y = framed ? 0.012 : 0.001; g.add(face);
   const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: 0xd9d2c0, roughness: 0.9 }));
   back.rotation.x = Math.PI / 2; g.add(back);
-  if (framed) {
-    const fm = new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.5, metalness: 0.2 });
-    [[0, -h / 2 - 0.015, w + 0.06, 0.03], [0, h / 2 + 0.015, w + 0.06, 0.03], [-w / 2 - 0.015, 0, 0.03, h], [w / 2 + 0.015, 0, 0.03, h]].forEach(([x, z, ww, hh]) => {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(ww, 0.025, hh), fm); b.position.set(x, 0.0125, z); g.add(b);
-    });
-  }
+  if (framed) setFrame(g, w, h, typeof framed === 'object' ? framed : frameStyle(id || 'x', frameKind(w / h)));
   return g;
+}
+/* marcos: cada tamaño de imagen tiene su juego de marcos, y los cuadros del mismo tamaño van rotando de marco */
+// wd ancho de la moldura, dp profundidad, mat paspartú (cartón alrededor de la imagen), lip filete interior, orn esquinas
+const FRAME_STYLES = {
+  chico: [
+    { col: 0xb8902f, metal: 0.85, rough: 0.32, wd: 0.034, dp: 0.03, lip: 0x5e4718, orn: true },   // dorado antiguo
+    { col: 0x141414, metal: 0.5, rough: 0.35, wd: 0.011, dp: 0.018, mat: 0.035, matCol: 0xf1ece0 }, // aluminio negro con paspartú
+    { col: 0xe9e6df, metal: 0, rough: 0.6, wd: 0.028, dp: 0.022 },                                  // madera blanca
+    { col: 0xa9adb3, metal: 0.9, rough: 0.25, wd: 0.016, dp: 0.02, mat: 0.028, matCol: 0x1d1d20 }   // plateado con paspartú negro
+  ],
+  alto: [
+    { col: 0x3b2516, metal: 0.05, rough: 0.55, wd: 0.04, dp: 0.03, lip: 0xb08a4a },                // nogal con filete dorado
+    { col: 0xb98a5a, metal: 0, rough: 0.7, wd: 0.026, dp: 0.025, mat: 0.045, matCol: 0xece4d2 },     // roble claro con paspartú
+    { col: 0x8a1f1f, metal: 0.2, rough: 0.3, wd: 0.022, dp: 0.022 },                                 // laca roja
+    { col: 0x202326, metal: 0.6, rough: 0.4, wd: 0.014, dp: 0.03 },                                  // caja negra fina, honda
+    { col: 0xc9a440, metal: 0.8, rough: 0.35, wd: 0.05, dp: 0.035, lip: 0x7a5d22, orn: true }       // barroco dorado
+  ],
+  ancho: [
+    { col: 0x9da3aa, metal: 0.9, rough: 0.3, wd: 0.012, dp: 0.016 },                                 // aluminio fino
+    { col: 0x5a3a22, metal: 0.05, rough: 0.6, wd: 0.045, dp: 0.03, mat: 0.04, matCol: 0xe8e0cc },   // madera oscura gruesa con paspartú
+    { col: 0xf2f0ea, metal: 0, rough: 0.55, wd: 0.035, dp: 0.025, lip: 0x9a9a9a },                   // blanco con filete gris
+    { col: 0xd4b04a, metal: 0.85, rough: 0.3, wd: 0.016, dp: 0.02 }                                  // dorado fino
+  ]
+};
+const frameKind = (a) => (a > 1.35 ? 'ancho' : a < 0.85 ? 'alto' : 'chico');
+const FRAME_MAX = { chico: 0.34, alto: 0.52, ancho: 0.64 }; // lado mayor de la imagen según su forma
+function frameStyle(id, kind) {
+  if (!SALV.frames) SALV.frames = {};
+  const k = id + '|' + kind;
+  if (SALV.frames[k] == null) {
+    SALV.frameN = SALV.frameN || {};
+    const n = SALV.frameN[kind] || 0; SALV.frameN[kind] = n + 1;
+    SALV.frames[k] = n % FRAME_STYLES[kind].length; saveSalv();
+  }
+  return FRAME_STYLES[kind][SALV.frames[k]];
+}
+const _frameGeo = new Map();
+function setFrame(g, w, h, st) {
+  g.children.filter((c) => c.userData.frame).forEach((c) => { g.remove(c); c.geometry.dispose(); itemByMesh.delete(c); const k = itemMeshes.indexOf(c); if (k >= 0) itemMeshes.splice(k, 1); });
+  if (!st) return;
+  const m = st.mat || 0, W = w + 2 * m, H = h + 2 * m, fw = st.wd, d = st.dp;
+  const fm = new THREE.MeshStandardMaterial({ color: st.col, metalness: st.metal, roughness: st.rough });
+  const add = (mesh) => { mesh.userData.frame = true; mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh; };
+  if (m) { const mp = add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ color: st.matCol, roughness: 0.95 }))); mp.rotation.x = -Math.PI / 2; mp.position.y = 0.008; }
+  const bars = (ww, hh, dd, mat, inset) => [[0, -H / 2 - ww / 2 + inset, W + 2 * ww - 2 * inset, ww], [0, H / 2 + ww / 2 - inset, W + 2 * ww - 2 * inset, ww], [-W / 2 - ww / 2 + inset, 0, ww, H - 2 * inset], [W / 2 + ww / 2 - inset, 0, ww, H - 2 * inset]]
+    .forEach(([x, z, a, b]) => { const bx = add(new THREE.Mesh(new THREE.BoxGeometry(a, dd, b), mat)); bx.position.set(x, dd / 2, z); });
+  bars(fw, 0, d, fm, 0);
+  if (st.lip) bars(0.007, 0, d * 0.75, new THREE.MeshStandardMaterial({ color: st.lip, metalness: 0.6, roughness: 0.4 }), 0.007);
+  if (st.orn) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+    const c = add(new THREE.Mesh(new THREE.BoxGeometry(fw * 1.5, d * 1.2, fw * 1.5), fm)); c.position.set(sx * (W / 2 + fw / 2), d * 0.6, sz * (H / 2 + fw / 2)); c.rotation.y = Math.PI / 4;
+  });
+  // el fondo: un cartón que tapa todo el cuadro por detrás
+  const bk = add(new THREE.Mesh(new THREE.PlaneGeometry(W + 2 * fw, H + 2 * fw), new THREE.MeshStandardMaterial({ color: 0x8a7a5e, roughness: 0.95 }))); bk.rotation.x = Math.PI / 2; bk.position.y = -0.0005;
+  // si el cuadro ya es un objeto del módulo, el marco nuevo también se agarra con el mouse
+  const it = items.find((o) => o.g === g);
+  if (it) g.children.forEach((c) => { if (c.userData.frame && !itemByMesh.has(c)) { itemByMesh.set(c, it); itemMeshes.push(c); c.castShadow = c.receiveShadow = true; } });
+  applyItemOffset(g);
 }
 function drawHalleyPoster(x, w, h) {
   const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#060a1c'); gr.addColorStop(1, '#1b0d2a');
@@ -1536,7 +1648,7 @@ function makeMobileMesh() {
 }
 const DECOR_1986 = [
   { id: 'poster:halley', make: () => addItem('poster:halley', 'poster', makePosterMesh(drawHalleyPoster, 0.42, 0.6, false), new THREE.Vector3(), { radius: 0.01, label: 'el póster del Halley', data: { half: 0.002 } }), off: [-0.1, 0.36, 0.0] },
-  { id: 'frame:tierra', make: () => addItem('frame:tierra', 'frame', makePosterMesh(drawEarthPhoto, 0.3, 0.24, true), new THREE.Vector3(), { radius: 0.02, label: 'el cuadro de la Tierra', data: { half: 0.004 } }), off: [0.12, 0.38, 0.08] },
+  { id: 'frame:tierra', make: () => addItem('frame:tierra', 'frame', makePosterMesh(drawEarthPhoto, 0.3, 0.24, FRAME_STYLES.chico[0]), new THREE.Vector3(), { radius: 0.02, label: 'el cuadro de la Tierra', data: { half: 0.004 } }), off: [0.12, 0.38, 0.08] },
   { id: 'mobile:saturno', make: () => addItem('mobile:saturno', 'mobile', makeMobileMesh(), new THREE.Vector3(), { radius: 0.06, label: 'el colgante de Saturno', data: { half: 0.0 } }), off: [0.0, 0.42, -0.12] }
 ];
 
@@ -1570,7 +1682,7 @@ function collectStruct() {
   scene.traverse((m) => {
     if (m.userData.stickGlass) { structMeshes.push(m); return; }
     if (!m.isMesh || itemByMesh.has(m) || m === projScreen || m.material === glassMat || DEBRIS.meshes.includes(m)) return;
-    let p = m; while (p) { if (p === earthPivot || p === screenRoll || p === sky) return; p = p.parent; }
+    let p = m; while (p) { if (p === earthPivot || p === screenRoll || p === sky || !p.visible) return; p = p.parent; }
     if (m.material && m.material.transparent) return;
     structMeshes.push(m);
   });
@@ -1617,7 +1729,8 @@ function stickHeld() {
 /* ---------- restos: catálogo por año, cápsulas, sonar y red ---------- */
 // Los envíos son restos de satélites que explotaron en el año de lo que llevaban: el frío los preservó.
 // Cada captura trae solo una parte de lo que hay de ese año.
-const DAY = /[?&]rapido/.test(location.search) ? 60e3 : 86400e3; // ?rapido: un "día" dura un minuto (para probar)
+// un "paso" del sonar dura 20 minutos reales y la red se llena en dos pasos; T (×30) los acelera también
+const DAY = /[?&]rapido/.test(location.search) ? 60e3 : 20 * 60e3; // ?rapido: un paso dura un minuto (para probar)
 const MAX_CRATES = 3;     // cuántas cápsulas pueden estar a bordo a la vez
 const PER_CRATE = 4;      // cuántas cosas trae cada cápsula como máximo
 const SALV = Object.assign({ got: [], spawned: [], crates: {}, lastSonar: 0, netStart: 0, first: true, netWarned: false, aoSeen: [], aoTitles: [], aoEntries: [], nextYear: 0 }, store.get('orbita.salvage', {}));
@@ -1844,8 +1957,9 @@ function registerEntry(year, cat, e0) {
     const pistas = Array.isArray(e.pistas) && e.pistas.length ? e.pistas.map((p) => (/^https?:/i.test(p) ? p : 'envios/' + ys + '/' + p)) : null;
     addEntry({ name: name0, id, year, kind: 'musica', make: () => { unlockTape({ name: name0, side: 'Restos ' + year, url: src, playlist: pistas }); return addItem(id, 'cassette', makeCassetteMesh(name0.toUpperCase().slice(0, 14)), new THREE.Vector3(), { radius: 0.012, label: 'el casete ' + name0 }); } });
   } else if (cat === 'decoracion') {
-    const id = 'deco:' + h, framed = /cuadro|marco|foto/i.test(name0 + ' ' + (e.archivo || ''));
-    addEntry({ name: name0, id, year, kind: 'decoracion', make: () => { const g = makeImagePoster(src, framed, name0); return addItem(id, framed ? 'frame' : 'poster', g, new THREE.Vector3(), { radius: 0.01, label: (framed ? 'el cuadro ' : 'el póster ') + name0, data: { half: framed ? 0.004 : 0.002 } }); } });
+    // algunas llegan enmarcadas como cuadros y otras como pósters
+    const id = 'deco:' + h, framed = /cuadro|marco|foto/i.test(name0 + ' ' + (e.archivo || '')) || (hashStr(id) % 100 < 45 && !/poster|póster|afiche|flyer/i.test(name0));
+    addEntry({ name: name0, id, year, kind: 'decoracion', make: () => { const g = makeImagePoster(src, framed, name0, id); return addItem(id, framed ? 'frame' : 'poster', g, new THREE.Vector3(), { radius: 0.01, label: (framed ? 'el cuadro ' : 'el póster ') + name0, data: { half: framed ? 0.004 : 0.002 } }); } });
   } else return false;
   return true;
 }
@@ -1890,7 +2004,8 @@ async function loadManifest() {
   Object.values(DISKS).forEach((d) => { if (d.src && mirrored.has(d.src)) d.src = mirrored.get(d.src); });
   manifestLoaded = count > 0;
   userLinks.forEach((l) => registerEntry(l.year, l.cat, l));
-  SALV.aoEntries.forEach((l) => registerEntry(l.year, l.cat, l));
+  // lo que había llegado de los temas que ya no se traen, deja de estar
+  SALV.aoEntries.forEach((l) => { if (!avoided(l.nombre) && !avoided(l.url)) registerEntry(l.year, l.cat, l); });
   (SALV.gens || []).forEach((g) => genDecor(g.year, g.n));
   (SALV.mine || []).forEach(registerMine);
   return manifestLoaded;
@@ -1979,11 +2094,16 @@ function updateHoles() {
   });
   HOLE.css.render(HOLE.scene, camera);
 }
-function makeImagePoster(src, framed, name) {
-  const g = makePosterMesh(drawPosterTitle(name, 'llegando…'), 0.4, 0.55, framed);
+function makeImagePoster(src, framed, name, id) {
+  // el marco se elige cuando se sabe la forma de la imagen
+  const g = makePosterMesh(drawPosterTitle(name, 'llegando…'), 0.4, 0.55, false);
+  if (framed) g.children[0].position.y = 0.012;
   const fit = (a) => {
-    const h = a >= 1 ? 0.45 / a : 0.6, w = a >= 1 ? 0.45 : 0.6 * a;
-    g.children.forEach((c) => { c.scale.set(w / 0.4, 1, h / 0.55); if (c.geometry.type === 'PlaneGeometry') c.scale.set(w / 0.4, h / 0.55, 1); });
+    let w, h;
+    if (framed) { const M = FRAME_MAX[frameKind(a)]; w = a >= 1 ? M : M * a; h = a >= 1 ? M / a : M; }
+    else { h = a >= 1 ? 0.45 / a : 0.6; w = a >= 1 ? 0.45 : 0.6 * a; }
+    g.children.slice(0, 2).forEach((c) => c.scale.set(w / 0.4, h / 0.55, 1));
+    if (framed) setFrame(g, w, h, frameStyle(id || name, frameKind(a)));
   };
   let urls = [];
   imageUrls(src).then((u) => { urls = u; return loadImageTex(u); }).then((t) => {
@@ -1995,6 +2115,7 @@ function makeImagePoster(src, framed, name) {
   })).catch(() => {
     const m = g.children[0].material, c = document.createElement('canvas'); c.width = 370; c.height = 512;
     drawPosterTitle(name, 'imagen dañada')(c.getContext('2d'), c.width, c.height);
+    if (framed) fit(0.4 / 0.55);
     if (m.map) m.map.dispose(); m.map = new THREE.CanvasTexture(c); m.needsUpdate = true;
   });
   return g;
@@ -2017,6 +2138,14 @@ const hasRestos = () => remainingIds().length > 0 || AO_RANDOM.on;
 let cheatBuf = '';
 function cheatKey(k) {
   cheatBuf = (cheatBuf + k.toLowerCase()).slice(-5);
+  if (cheatBuf === 'idkfa') {
+    // IDKFA: trae ya un satélite entero para acoplar adelante
+    cheatBuf = '';
+    if (ANNEX.state === 'leaving') { toast('IDKFA: esperá a que el módulo anterior termine de alejarse.'); return; }
+    if (SALV.annex) { toast('IDKFA: ya hay un módulo ' + (ANNEX.state === 'approach' ? 'acercándose' : 'acoplado') + ' adelante. Desacoplalo primero.'); return; }
+    if (annexArrive(true)) { beep(880, 0.08); setTimeout(() => beep(1320, 0.14), 120); }
+    return;
+  }
   if (cheatBuf !== 'iddqd') return;
   cheatBuf = '';
   if (cratesAboard() >= MAX_CRATES) { toast('IDDQD: la esclusa está llena. Expulsá alguna cápsula y probá de nuevo.'); return; }
@@ -2032,7 +2161,7 @@ function cheatKey(k) {
 const RUN_LEN = 10;
 // el anillo de restos está dividido en franjas de años; el módulo está en una y viajar a otra lleva tiempo
 const FRANJAS = [[1983, 1985], [1986, 1988], [1989, 1991], [1992, 1994], [1995, 1997], [1998, 1999]];
-const TRAVEL_PER = /[?&]rapido/.test(location.search) ? 60 : 7200; // segundos de tiempo del módulo por franja (T lo acelera)
+const TRAVEL_PER = /[?&]rapido/.test(location.search) ? 60 : 1800; // segundos de tiempo del módulo por franja (T lo acelera)
 if (!SALV.nav) SALV.nav = { at: 1, to: 1, done: 0 };
 const navAt = () => SALV.nav.at, traveling = () => SALV.nav.to !== SALV.nav.at;
 const franjaTxt = (i) => FRANJAS[i][0] + '–' + FRANJAS[i][1];
@@ -2338,8 +2467,14 @@ const PAISES = {
 const LANG_WORDS = { spa: 'spa OR Spanish OR Español', por: 'por OR Portuguese OR Português', eng: 'eng OR English', fre: 'fre OR French OR Français', ita: 'ita OR Italian', ger: 'ger OR German OR Deutsch', dut: 'dut OR Dutch', swe: 'swe OR Swedish', pol: 'pol OR Polish', rus: 'rus OR Russian', jpn: 'jpn OR Japanese', hin: 'hin OR Hindi' };
 function guessPais() { const m = /-([A-Z]{2})$/i.exec(navigator.language || ''); const k = m ? m[1].toLowerCase() : ''; return PAISES[k] ? k : (/^es/i.test(navigator.language || '') ? 'ar' : ''); }
 const AO_RANDOM = { on: store.get('orbita.aoRandom', true), pais: store.get('orbita.pais', guessPais()), offlineWarned: false };
+// temas que no llegan: lo racial, la política, la propaganda y los movimientos sociales (Agustin quiere cultura pop)
+const AVOID_WORDS = ['nazi', 'nazis', 'hitler', 'holocaust', 'fascist', 'fascism', 'communist', 'communism', 'socialist', 'socialism', 'marxist', 'propaganda', 'racist', 'racism', 'racial', 'segregation', 'apartheid', 'slavery', 'supremacist', 'supremacy', 'ku klux', 'kkk', 'white power', 'black power', 'black panther', 'civil rights', 'race relations', 'politics', 'political', 'election', 'campaign', 'protest', 'riot', 'dictatorship', 'genocide', 'extremist', 'nationalist', 'swastika', 'third reich', 'neo-nazi', 'skinhead', 'terrorism', 'immigration'];
+const AVOID_RE = new RegExp('\\b(' + AVOID_WORDS.concat(['nazismo', 'fascismo', 'comunismo', 'comunista', 'socialismo', 'racismo', 'racista', 'política', 'politica', 'político', 'elecciones', 'dictadura', 'militancia', 'propaganda', 'derechos civiles', 'protesta', 'golpe de estado']).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')s?\\b', 'i');
+const avoided = (t) => AVOID_RE.test(String(t || ''));
+const AO_AVOID = ' AND NOT (' + AVOID_WORDS.map((w) => /\s/.test(w) ? '"' + w + '"' : w).map((w) => 'subject:' + w + ' OR title:' + w).join(' OR ') + ')';
+const COMMONS_AVOID = ' ' + AVOID_WORDS.filter((w) => !/\s/.test(w)).map((w) => '-' + w).join(' ');
 const AO_Q = {
-  videos: 'mediatype:movies AND (collection:prelinger OR collection:classic_tv OR collection:feature_films OR collection:classic_tv_commercials OR collection:television OR collection:moviesandfilms OR collection:opensource_movies OR collection:computerchronicles)',
+  videos: 'mediatype:movies AND (collection:classic_tv OR collection:feature_films OR collection:classic_tv_commercials OR collection:television OR collection:moviesandfilms OR collection:computerchronicles)',
   juegos: 'collection:softwarelibrary_msdos_games',
   programas: 'collection:softwarelibrary_msdos',
   revistas: 'mediatype:texts AND (collection:magazine_rack OR collection:computermagazines OR collection:pulpmagazinearchive OR collection:magazines)',
@@ -2350,8 +2485,8 @@ const AO_Q = {
 // cuánto pesa cada tipo al llenar una cápsula
 // el software al azar no se lee bien directo de archive.org: llega por el espejo de GitHub (herramientas/espejo.py)
 const AO_MIX = ['videos', 'videos', 'videos', 'revistas', 'revistas', 'musica', 'musica', 'decoracion', 'decoracion'];
-const countryFilter = (cat) => {
-  const p = PAISES[AO_RANDOM.pais];
+const countryFilter = (cat, paisK) => {
+  const p = PAISES[paisK != null ? paisK : AO_RANDOM.pais];
   if (!p || !p[1] || cat === 'juegos' || cat === 'programas') return '';
   return ' AND (language:(' + LANG_WORDS[p[1]] + ') OR country:"' + p[0] + '" OR subject:"' + p[0] + '")';
 };
@@ -2366,15 +2501,15 @@ function jsonp(url) {
   });
 }
 async function aoSearch(q, rows, page, sort) {
-  const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q) + '&fl[]=identifier&fl[]=title' + (sort ? '&sort[]=' + encodeURIComponent(sort) : '') + '&rows=' + rows + '&page=' + page + '&output=json';
+  const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q) + '&fl[]=identifier&fl[]=title&fl[]=subject' + (sort ? '&sort[]=' + encodeURIComponent(sort) : '') + '&rows=' + rows + '&page=' + page + '&output=json';
   let j;
   try { const r = await fetch(url); if (!r.ok) throw new Error(r.status); j = await r.json(); } catch (e) { j = await jsonp(url); }
   return j.response || { numFound: 0, docs: [] };
 }
 // best: lo mejor que haya, entre lo más visto de archive.org para ese año
-async function aoRandomItem(year, cat, best) {
-  const base = AO_Q[cat] + ' AND year:' + year;
-  for (const q of [base + countryFilter(cat), base]) {
+async function aoRandomItem(year, cat, best, paisK) {
+  const base = AO_Q[cat] + ' AND year:' + year + AO_AVOID;
+  for (const q of [base + countryFilter(cat, paisK), base]) {
     // representativo del año: entre lo más visto de ese año (lo mejor: entre los primeros 15)
     const top = (await aoSearch(q, best ? 40 : 120, 1, 'downloads desc')).docs || [];
     const n = top.length;
@@ -2384,6 +2519,7 @@ async function aoRandomItem(year, cat, best) {
       if (!doc || SALV.aoSeen.includes(doc.identifier)) continue;
       // nada repetido: ni el mismo ítem ni otro con el mismo título
       const t0 = Array.isArray(doc.title) ? doc.title[0] : doc.title;
+      if (avoided(t0) || avoided(doc.identifier) || avoided([].concat(doc.subject || []).join(' '))) { SALV.aoSeen.push(doc.identifier); continue; }
       const tk = titleKey(t0 || doc.identifier);
       if (SALV.aoTitles.includes(tk) || [...CATALOG.values()].some((x) => x.tkey === tk)) { SALV.aoSeen.push(doc.identifier); continue; }
       // la música llega como discos o casetes completos, no temas sueltos
@@ -2402,8 +2538,8 @@ const randomYear = () => { const [a, b] = FRANJAS[navAt()]; return a + Math.floo
 // decoración: Wikimedia Commons deja leer sus imágenes desde cualquier página y las ordena por año
 const COMMONS_PAIS = { ar: 'Argentina', uy: 'Uruguay', cl: 'Chile', py: 'Paraguay', bo: 'Bolivia', pe: 'Peru', co: 'Colombia', ve: 'Venezuela', mx: 'Mexico', cu: 'Cuba', es: 'Spain', br: 'Brazil', pt: 'Portugal', us: 'the United States', ca: 'Canada', gb: 'the United Kingdom', ie: 'Ireland', au: 'Australia', fr: 'France', it: 'Italy', de: 'Germany', nl: 'the Netherlands', se: 'Sweden', pl: 'Poland', ru: 'Russia', jp: 'Japan', in: 'India' };
 // carteles: pósters de películas y de videojuegos de ese año (primero esos, después lo demás)
-async function commonsDecor(year, carteles) {
-  const pais = COMMONS_PAIS[AO_RANDOM.pais];
+async function commonsDecor(year, carteles, paisK) {
+  const pais = COMMONS_PAIS[paisK != null ? paisK : AO_RANDOM.pais];
   const shuffle = (a) => a.filter(Boolean).sort(() => Math.random() - 0.5);
   const qs = carteles
     ? [...shuffle([`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`]), ...shuffle([`incategory:"${year} video games" poster`, `"video game" advertisement ${year}`, `"arcade flyer" ${year}`])]
@@ -2411,12 +2547,13 @@ async function commonsDecor(year, carteles) {
   if (carteles) { const k = Math.random() < 0.5 ? 0 : 3; qs.unshift(...qs.splice(k, 3)); }
   for (const q of qs) {
     const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
-      + encodeURIComponent('filetype:bitmap ' + q) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
+      + encodeURIComponent('filetype:bitmap ' + q + COMMONS_AVOID) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
     const r = await fetch(url); if (!r.ok) throw new Error(r.status);
     const pages = Object.values(((await r.json()).query || {}).pages || {}).filter((p) => p.imageinfo && p.imageinfo[0].thumburl && p.imageinfo[0].width >= 300);
     for (let tries = 0; tries < 8 && pages.length; tries++) {
       const p = pages.splice(Math.floor(Math.random() * pages.length), 1)[0], ii = p.imageinfo[0];
       const nombre = p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/[_\s]+/g, ' ').slice(0, 44);
+      if (avoided(p.title)) continue;
       const tk = titleKey(nombre);
       if (SALV.aoSeen.includes(ii.thumburl) || SALV.aoTitles.includes(tk)) continue;
       SALV.aoSeen.push(ii.thumburl); SALV.aoTitles.push(tk);
@@ -2443,7 +2580,7 @@ function genDecor(year, n0) {
     x.textAlign = 'left';
   };
   const name = (framed ? 'Foto ' : 'Postal ') + satName(year);
-  addEntry({ name, id, year, kind: 'decoracion', make: () => addItem(id, framed ? 'frame' : 'poster', makePosterMesh(draw, framed ? 0.3 : 0.32, framed ? 0.24 : 0.44, framed), new THREE.Vector3(), { radius: 0.01, label: (framed ? 'la foto ' : 'la postal ') + name, data: { half: framed ? 0.004 : 0.002 } }) });
+  addEntry({ name, id, year, kind: 'decoracion', make: () => addItem(id, framed ? 'frame' : 'poster', makePosterMesh(draw, framed ? 0.3 : 0.32, framed ? 0.24 : 0.44, framed, id), new THREE.Vector3(), { radius: 0.01, label: (framed ? 'la foto ' : 'la postal ') + name, data: { half: framed ? 0.004 : 0.002 } }) });
   return id;
 }
 // suma a la cápsula cosas al azar de su año; siempre intenta traer decoración, y nunca llega vacía
@@ -2686,7 +2823,7 @@ const floorGlassMat = glassMat.clone();
 });
 {
   const gl = new THREE.Mesh(new THREE.CircleGeometry(1.56, 64), glassMat);
-  gl.position.set(0, POD.C, POD.z0 - 0.02); scene.add(gl);
+  gl.position.set(0, POD.C, POD.z0 - 0.02); scene.add(gl); FRONT.glass = gl;
 }
 const warmColor = new THREE.Color(), neutral = new THREE.Color(0xdfe8ff), warmest = new THREE.Color(0xffa452);
 function applyLights() {
@@ -3008,7 +3145,7 @@ function toggleLamp() { lights.lamp = !lights.lamp; store.set('orbita.lamp', lig
 
 /* ---------- órbita ---------- */
 const ORBIT = 1200; // segundos por vuelta (20 min)
-let simTime = 0, timeScale = 1, realTime = 0;
+let simTime = 0, timeScale = 1, realTime = 0, salvSaveT = 0;
 const U = new THREE.Vector3(0.45, 0.85, 0.25).normalize();
 const Wv = new THREE.Vector3(-0.75, 0.05, -0.55).normalize();
 Wv.sub(U.clone().multiplyScalar(Wv.dot(U))).normalize();
@@ -3017,6 +3154,29 @@ const toEarth = EARTH_C.clone().normalize();
 const umbra = Math.asin(EARTH_R / EARTH_C.length());
 let sunVisible = 1;
 
+/* la órbita pasa por arriba de la Argentina: el eje de la Tierra se inclina para que el módulo recorra el paralelo de
+   Buenos Aires (34,6° sur, que también cruza Chile, Sudáfrica y Australia), y la Tierra arranca girada para que
+   Buenos Aires pase justo abajo en la hora más clara de la primera vuelta */
+{
+  const LAT = -34.6 * Math.PI / 180, LON = -58.4 * Math.PI / 180, Y = new THREE.Vector3(0, 1, 0);
+  const d = EARTH_C.clone().negate().normalize(); // del centro de la Tierra hacia el módulo
+  const a0 = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(0.35, 0, 0.5));
+  const axis = a0.clone().addScaledVector(d, -a0.dot(d)).normalize().multiplyScalar(Math.cos(LAT)).addScaledVector(d, Math.sin(LAT)).normalize();
+  const qAlign = new THREE.Quaternion().setFromUnitVectors(Y, axis);
+  let tBest = 0, best = -2;
+  for (let t = 0; t < ORBIT; t += 5) {
+    const th = THETA0 + t / ORBIT * Math.PI * 2, k = U.clone().multiplyScalar(Math.cos(th)).addScaledVector(Wv, Math.sin(th)).normalize().dot(d);
+    if (k > best) { best = k; tBest = t; }
+  }
+  // el punto de la textura de Buenos Aires (la esfera de three.js empieza en la longitud -180)
+  const phi = LON + Math.PI, T = new THREE.Vector3(-Math.cos(phi) * Math.cos(LAT), Math.sin(LAT), Math.sin(phi) * Math.cos(LAT));
+  const w = d.clone().applyQuaternion(qAlign.clone().invert()), v = new THREE.Vector3();
+  let psi = 0, bd = Infinity;
+  for (let a = 0; a < Math.PI * 2; a += 0.002) { const dd = v.copy(w).applyAxisAngle(Y, -a).distanceTo(T); if (dd < bd) { bd = dd; psi = a; } }
+  const phase = psi + (tBest / ORBIT) * Math.PI * 2 * 0.9; // earthSpin gira -(t/ORBIT)·2π·0.9
+  earthPivot.quaternion.copy(qAlign).multiply(new THREE.Quaternion().setFromAxisAngle(Y, phase));
+
+}
 /* cielo: estrellas, Luna y planetas giran juntos, una vuelta por órbita (el módulo siempre mira a la Tierra) */
 const ORBIT_N = new THREE.Vector3().crossVectors(U, Wv).normalize();
 const sky = new THREE.Group();
@@ -4958,6 +5118,328 @@ function toast(msg, ms = 6000) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms);
 }
 
+/* ---------- satélites enteros para acoplar: llegan por adelante, son de una década y de un país ---------- */
+// el módulo encontrado se acopla a la ventana redonda de adelante: ahí aparece una escotilla y un túnel corto
+const DOCK = { r: 0.8, len: 1.0 };
+const ANNEX = { state: 'none', g: null, dz: 0, t: 0, dur: 30, doorT: 0, doorOpen: false, z1: POD.z0 - DOCK.len, z0: POD.z0 - DOCK.len - 9, panelT: 0, queue: [] };
+const ANNEX_NAMES = ['AURORA', 'COMETA', 'ESTELA', 'NEBULOSA', 'ORIÓN', 'POLARIS', 'SIRIO', 'ZÉNIT', 'VEGA', 'CENTELLA'];
+const annexDesk = () => ({ x: 1.45, top: 0.95, za: ANNEX.z0 + 1.7, zb: ANNEX.z0 + 3.5 });
+// las luces del módulo existen desde el principio, apagadas: así no se recompila nada cuando llega
+ANNEX.lights = [0, 1].map((k) => { const l = new THREE.PointLight(0xffd9a8, 0, 7.5, 2); l.position.set(0, POD.C + 1.2, ANNEX.z0 + 2.5 + k * 4.5); scene.add(l); return l; });
+// del lado de adentro: el aro de acople, la escotilla y el panel
+const dockAdapter = new THREE.Group(); dockAdapter.visible = false; scene.add(dockAdapter);
+const dockMat = new THREE.MeshStandardMaterial({ color: 0x4a525c, roughness: 0.45, metalness: 0.65 });
+{
+  const plate = new THREE.Mesh(new THREE.RingGeometry(DOCK.r + 0.04, 1.58, 64), dockMat);
+  plate.position.set(0, POD.C, POD.z0 - 0.03); dockAdapter.add(plate);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(DOCK.r + 0.06, 0.06, 12, 48), matFrame);
+  ring.position.set(0, POD.C, POD.z0 - 0.01); dockAdapter.add(ring);
+  [0, 1, 2, 3, 4, 5, 6, 7].forEach((k) => { // pernos del aro
+    const a = k * Math.PI / 4 + Math.PI / 8, b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 10), matFrame);
+    b.rotation.x = Math.PI / 2; b.position.set(Math.cos(a) * 1.25, POD.C + Math.sin(a) * 1.25, POD.z0 - 0.01); dockAdapter.add(b);
+  });
+}
+const dockDoor = new THREE.Mesh(new THREE.CylinderGeometry(DOCK.r + 0.04, DOCK.r + 0.04, 0.05, 48), new THREE.MeshStandardMaterial({ color: 0x5b636d, roughness: 0.5, metalness: 0.6 }));
+dockDoor.rotation.x = Math.PI / 2; dockDoor.position.set(0, POD.C, POD.z0 - 0.07); dockAdapter.add(dockDoor);
+{
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.06), matOrange); bar.position.set(0, 0.04, 0); dockDoor.add(bar);
+  const port = new THREE.Mesh(new THREE.CircleGeometry(0.14, 32), matGlow); port.rotation.x = -Math.PI / 2; port.position.set(0, 0.027, 0.35); dockDoor.add(port);
+}
+// panel del acople: abajo de la ventana de adelante
+const dockCanvas = document.createElement('canvas'); dockCanvas.width = 320; dockCanvas.height = 160;
+const dockTex = new THREE.CanvasTexture(dockCanvas);
+const dockPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.22), new THREE.MeshStandardMaterial({ map: dockTex, emissive: 0xffffff, emissiveMap: dockTex, emissiveIntensity: 0.55, roughness: 0.6 }));
+dockPanel.position.set(0, POD.C - 1.9, POD.z0 + 0.012); scene.add(dockPanel);
+const btnDockDoor = box(0.1, 0.06, 0.035, new THREE.MeshStandardMaterial({ color: 0x5f9a6a, roughness: 0.5 }), -0.3, POD.C - 1.9, POD.z0 + 0.02, false);
+const btnUndock = box(0.1, 0.06, 0.035, new THREE.MeshStandardMaterial({ color: 0xb03a2a, roughness: 0.5 }), 0.3, POD.C - 1.9, POD.z0 + 0.02, false);
+function drawDockPanel() {
+  const x = dockCanvas.getContext('2d'), W = 320, H = 160, A = SALV.annex;
+  x.fillStyle = '#0b0f0d'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(120,255,170,0.35)'; x.strokeRect(4, 4, W - 8, H - 8);
+  x.fillStyle = '#8fffb8'; x.font = '22px VT323, monospace'; x.fillText('ACOPLE DELANTERO', 14, 30);
+  x.font = '20px VT323, monospace'; x.fillStyle = '#d8ffe6';
+  let l1 = 'SIN MÓDULO', l2 = 'el sonar avisa si aparece uno';
+  if (A && ANNEX.state === 'approach') { l1 = 'SE ACERCA ' + A.name; l2 = PAISES[A.pais][0] + ' ' + A.year + ' · a ' + Math.ceil(ANNEX.dz) + ' m'; }
+  else if (A && ANNEX.state === 'docked') { l1 = 'ACOPLADO CON ' + A.name; l2 = PAISES[A.pais][0] + ' ' + A.year + ' · ' + (ANNEX.doorOpen ? 'escotilla abierta' : 'escotilla cerrada'); }
+  else if (ANNEX.state === 'leaving') { l1 = 'MÓDULO DESACOPLADO'; l2 = 'el módulo se aleja'; }
+  x.fillText(l1, 14, 66); x.fillStyle = '#9fc9b0'; x.fillText(l2, 14, 92);
+  x.fillStyle = '#7fae90'; x.font = '18px VT323, monospace';
+  x.fillText('◀ ESCOTILLA', 14, 140); x.textAlign = 'right'; x.fillText('DESACOPLAR ▶', W - 14, 140); x.textAlign = 'left';
+  dockTex.needsUpdate = true;
+}
+// paleta según la década: los 80 beige y naranja con alfombra marrón; los 90 gris verdoso, violeta y turquesa
+function annexPalette(year) {
+  return year < 1990
+    ? { base: '#b7aa8e', accent: 0xff7a2a, light: 0xffc98a, floorA: '#5b3b28', floorB: '#6e4a31', rib: 0x6a5a48 }
+    : { base: '#6c7c83', accent: 0x9a5cff, light: 0xbfe8ff, floorA: '#232a44', floorB: '#2c3658', rib: 0x3c4650 };
+}
+function buildAnnex(def) {
+  const g = new THREE.Group(), rnd = mulberry(def.seed), pal = annexPalette(def.year), A = ANNEX;
+  const pm = [0, 1, 2, 3, 4, 5].map((i) => new THREE.MeshStandardMaterial({ map: hullPanel(def.seed + i * 37, pal.base), roughness: 0.75, metalness: 0.2 }));
+  const floorTex2 = canvasTex(256, 256, (x, w, h) => {
+    x.fillStyle = pal.floorA; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 4000; i++) { x.fillStyle = Math.random() < 0.5 ? pal.floorB : 'rgba(0,0,0,0.25)'; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    x.strokeStyle = 'rgba(0,0,0,0.5)'; x.lineWidth = 3; x.strokeRect(0, 0, w, h);
+  }, 1, 1);
+  const floorM = new THREE.MeshStandardMaterial({ map: floorTex2, roughness: 0.95 });
+  const ribM = new THREE.MeshStandardMaterial({ color: pal.rib, roughness: 0.5, metalness: 0.5 });
+  const accentM = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: pal.accent, emissiveIntensity: 0.8 });
+  const stripM = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: pal.light, emissiveIntensity: 1.0 });
+  const add = (w, h, d, mat, x, y, z, parent = g) => box(w, h, d, mat, x, y, z, false, parent);
+  A.win = new Set(['6:1', '6:4', '6:7', '2:5', '2:7', '3:2', '5:5']);
+  for (let i = 0; i < 8; i++) {
+    const { th, nx, ny } = faceFrame(i);
+    for (let sgi = 0; sgi < 9; sgi++) {
+      const zc = A.z0 + sgi + 0.5, cx = nx * (POD.A + 0.05), cy = POD.C + ny * (POD.A + 0.05);
+      if (A.win.has(i + ':' + sgi)) {
+        const fr = new THREE.Group(); fr.position.set(cx, cy, zc); fr.rotation.z = th; g.add(fr);
+        add(POD.S, 0.14, 0.09, ribM, 0, 0, -0.455, fr); add(POD.S, 0.14, 0.09, ribM, 0, 0, 0.455, fr);
+        add(0.09, 0.14, 1, ribM, -POD.S / 2 + 0.045, 0, 0, fr); add(0.09, 0.14, 1, ribM, POD.S / 2 - 0.045, 0, 0, fr);
+        const gl = new THREE.Mesh(new THREE.PlaneGeometry(POD.S - 0.1, 0.92), glassMat);
+        gl.position.set(nx * (POD.A + 0.06), POD.C + ny * (POD.A + 0.06), zc); gl.rotation.set(Math.PI / 2, 0, th, 'ZXY');
+        gl.userData.stickGlass = true; g.add(gl);
+        continue;
+      }
+      const p = add(POD.S + 0.02, 0.1, 1.0, i === 0 ? floorM : pm[(i * 5 + sgi * 3) % pm.length], cx, cy, zc); p.rotation.z = th;
+    }
+    const corner = i * Math.PI / 4 + Math.PI / 8, R = POD.A / Math.cos(Math.PI / 8) - 0.04;
+    const ex = Math.sin(corner) * R, ey = POD.C - Math.cos(corner) * R;
+    if (i === 3 || i === 4) { const s = add(0.05, 0.05, 8.6, stripM, ex, ey, (A.z0 + A.z1) / 2); s.rotation.z = corner; }
+    else if (i === 0 || i === 7) { const s = add(0.03, 0.03, 8.6, accentM, ex, ey + 0.01, (A.z0 + A.z1) / 2); s.rotation.z = corner; }
+  }
+  [A.z0 + 0.05, A.z0 + 4.5, A.z1 - 0.05].forEach((z) => {
+    for (let i = 1; i < 8; i++) { const { th, nx, ny } = faceFrame(i); const r = add(POD.S + 0.06, 0.12, 0.14, ribM, nx * (POD.A - 0.04), POD.C + ny * (POD.A - 0.04), z); r.rotation.z = th; }
+  });
+  // tapa del fondo, con su ventana redonda
+  {
+    const s = octShape(R_OUT), hole = new THREE.Path(); hole.absarc(0, 0, 1.55, 0, Math.PI * 2, true); s.holes.push(hole);
+    const cap = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: false, curveSegments: 40 }), pm[2]);
+    cap.position.set(0, POD.C, A.z0 - 0.12); g.add(cap);
+    const ringM = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.09, 12, 64), ribM); ringM.position.set(0, POD.C, A.z0); g.add(ringM);
+    add(0.07, 3.1, 0.07, ribM, 0, POD.C, A.z0); add(3.1, 0.07, 0.07, ribM, 0, POD.C + 0.35, A.z0);
+    const gl = new THREE.Mesh(new THREE.CircleGeometry(1.56, 64), glassMat); gl.position.set(0, POD.C, A.z0 - 0.02); g.add(gl);
+  }
+  // tapa de este lado, con el hueco del túnel, y el túnel hasta nuestra escotilla
+  {
+    const s = octShape(R_OUT), hole = new THREE.Path(); hole.absarc(0, 0, DOCK.r + 0.08, 0, Math.PI * 2, true); s.holes.push(hole);
+    const cap = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: false, curveSegments: 40 }), pm[4]);
+    cap.position.set(0, POD.C, A.z1); g.add(cap);
+    const ringM = new THREE.Mesh(new THREE.TorusGeometry(DOCK.r + 0.1, 0.06, 12, 48), ribM); ringM.position.set(0, POD.C, A.z1); g.add(ringM);
+    const zA = A.z1 + 0.12, zB = POD.z0 - 0.12, L = zB - zA;
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(DOCK.r + 0.1, DOCK.r + 0.1, L, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.6, metalness: 0.5, side: THREE.DoubleSide }));
+    tube.rotation.x = Math.PI / 2; tube.position.set(0, POD.C, (zA + zB) / 2); g.add(tube);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(DOCK.r + 0.16, 0.08, 10, 48), ribM); collar.position.set(0, POD.C, zB - 0.02); g.add(collar);
+    const glow = new THREE.Mesh(new THREE.TorusGeometry(DOCK.r + 0.08, 0.01, 6, 48), accentM); glow.position.set(0, POD.C, (zA + zB) / 2); g.add(glow);
+    // cartel con el nombre del módulo, su país y su año, mirando hacia adentro del módulo
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d');
+    x.fillStyle = '#16120e'; x.fillRect(0, 0, 512, 128); x.strokeStyle = '#' + pal.accent.toString(16).padStart(6, '0'); x.lineWidth = 6; x.strokeRect(6, 6, 500, 116);
+    x.fillStyle = '#f2e6c9'; x.font = '44px VT323, monospace'; x.textAlign = 'center'; x.fillText('MÓDULO ' + def.name, 256, 58);
+    x.font = '30px VT323, monospace'; x.fillText(PAISES[def.pais][0].toUpperCase() + ' · ' + def.year, 256, 98);
+    const t = new THREE.CanvasTexture(c);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.35 }));
+    sign.position.set(0, POD.C + 1.2, A.z1 - 0.01); sign.rotation.y = Math.PI; g.add(sign);
+  }
+  // una computadora de la época sobre un escritorio (de adorno: todavía no se puede usar)
+  {
+    const d = annexDesk(), zc = (d.za + d.zb) / 2;
+    add(POD.A - d.x, 0.05, d.zb - d.za, ribM, (POD.A + d.x) / 2, d.top - 0.025, zc);
+    add(0.06, d.top - 0.05, d.zb - d.za - 0.2, pm[1], d.x + 0.05, (d.top - 0.05) / 2 + 0.05, zc);
+    const ochenta = def.year < 1990, beige = new THREE.MeshStandardMaterial({ color: ochenta ? 0xc9b48a : 0xd8d0bc, roughness: 0.6 });
+    const sc = document.createElement('canvas'); sc.width = 256; sc.height = 192; const x = sc.getContext('2d');
+    x.fillStyle = ochenta ? '#2a2a8a' : '#050805'; x.fillRect(0, 0, 256, 192);
+    x.fillStyle = ochenta ? '#9a9aff' : '#b8ffb8'; x.font = '18px VT323, monospace';
+    (ochenta ? ['**** BASIC ' + def.year + ' ****', '', '38911 BYTES LIBRES', '', 'LISTO.', '█'] : [def.name + ' DOS 3.30', '', 'C:\\> DIR', ' JUEGOS    <DIR>', ' MUSICA    <DIR>', 'C:\\> █']).forEach((l, k) => x.fillText(l, 12, 26 + k * 24));
+    const st = new THREE.CanvasTexture(sc);
+    const mon = new THREE.Group(); mon.position.set(d.x + 0.35, d.top, zc); mon.rotation.y = -Math.PI / 2; g.add(mon);
+    add(0.42, 0.34, 0.36, beige, 0, 0.27, 0, mon);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.24), new THREE.MeshStandardMaterial({ map: st, emissive: 0xffffff, emissiveMap: st, emissiveIntensity: 0.8 }));
+    scr.position.set(0, 0.28, 0.182); mon.add(scr);
+    add(ochenta ? 0.46 : 0.44, ochenta ? 0.07 : 0.03, ochenta ? 0.2 : 0.16, beige, 0, ochenta ? 0.035 : 0.015, 0.36, mon);
+    if (!ochenta) add(0.18, 0.4, 0.4, beige, 0.34, 0.2, -0.05, mon);
+  }
+  // pasamanos, como en el nuestro
+  add(0.03, 0.03, 7.6, ribM, -1.95, POD.C - 1.15, (A.z0 + A.z1) / 2);
+  g.traverse((m) => { if (m.isMesh) m.receiveShadow = true; });
+  return g;
+}
+// lugares en las paredes para la decoración: nunca en las ventanas ni sobre el escritorio
+function annexSlots(def) {
+  const rnd = mulberry(def.seed + 7), out = [];
+  [1, 2, 3, 5, 6, 7].forEach((i) => { for (let sgi = 1; sgi < 8; sgi++) { if (ANNEX.win.has(i + ':' + sgi) || ((i === 1 || i === 2) && sgi <= 3)) continue; out.push([i, sgi]); } });
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out.map(([i, sgi]) => ({ i, sgi, dz: (rnd() - 0.5) * 0.35, dl: (rnd() - 0.5) * 0.3 }));
+}
+const _sn = new THREE.Vector3();
+function stickAt(it, point, n) {
+  _up.set(0, 1, 0);
+  if (Math.abs(n.y) > 0.85) _up.set(0, 0, -1);
+  _bz.copy(_up).addScaledVector(n, -_up.dot(n)).normalize().negate();
+  _bx.crossVectors(n, _bz).normalize();
+  _m4.makeBasis(_bx, n, _bz);
+  it.g.quaternion.setFromRotationMatrix(_m4);
+  const half = it.data.half != null ? it.data.half : it.radius;
+  it.g.position.copy(point).addScaledVector(n, half + 0.003);
+  it.vel.set(0, 0, 0); it.spin.set(0, 0, 0); it.stuck = true;
+  layerStuck(it);
+}
+function placeAnnexItem(id) {
+  const A = SALV.annex;
+  if (!A || ANNEX.state !== 'docked' || itemById(id) || (itemState[id] && itemState[id].gone)) return;
+  const e = CATALOG.get(id); if (!e) return;
+  const it = e.make(); if (!it) return;
+  if (!SALV.spawned.includes(id)) SALV.spawned.push(id);
+  A.slot = A.slot || 0;
+  const s = ANNEX.slots[A.slot++ % ANNEX.slots.length];
+  const { th, nx, ny } = faceFrame(s.i);
+  const p = new THREE.Vector3(nx * POD.A + Math.cos(th) * s.dl, POD.C + ny * POD.A + Math.sin(th) * s.dl, ANNEX.z0 + s.sgi + 0.5 + s.dz);
+  stickAt(it, p, _sn.set(-nx, -ny, 0));
+  saveItems(); saveSalv();
+}
+// lo que trae: pósters y fotos de ese país y ese año, y alguna película, revista o música, todo pegado con velcro
+async function fillAnnex() {
+  const A = SALV.annex;
+  if (!A || A.filled || A.filling) return;
+  A.filling = true;
+  const add = (id) => { if (!A.ids.includes(id)) A.ids.push(id); if (!SALV.got.includes(id)) SALV.got.push(id); saveSalv(); placeAnnexItem(id); };
+  if (AO_RANDOM.on) {
+    let fails = 0;
+    for (const cat of ['carteles', 'decoracion', 'decoracion', 'videos', 'carteles', 'revistas', 'decoracion', 'musica', 'decoracion']) {
+      if (fails >= 4 || SALV.annex !== A) break;
+      let e = null;
+      try { e = cat === 'decoracion' || cat === 'carteles' ? await commonsDecor(A.year, cat === 'carteles', A.pais) : await aoRandomItem(A.year, cat, false, A.pais); } catch (err) { fails++; continue; }
+      if (!e) continue;
+      if (e.cat === 'carteles') e.cat = 'decoracion';
+      const id = linkId(e);
+      if (SALV.got.includes(id) || !registerEntry(e.year, e.cat, e)) continue;
+      SALV.aoEntries.push(e); add(id);
+    }
+  }
+  if (SALV.annex !== A) return;
+  // sin internet (o con los restos de archive.org apagados) igual llega decorado: fotos y postales del satélite
+  while (A.ids.filter((id) => /^(deco|gen):/.test(id)).length < 5) add(genDecor(A.year));
+  A.filling = false; A.filled = true; saveSalv();
+}
+function setDocked(on) {
+  dockAdapter.visible = on;
+  [FRONT.mull, FRONT.mull2, FRONT.glass].forEach((m) => { if (m) m.visible = !on; });
+}
+function annexArrive(fast) {
+  if (SALV.annex || ANNEX.state !== 'none') return false;
+  const keys = Object.keys(PAISES).filter((k) => k), pais = keys[Math.floor(Math.random() * keys.length)];
+  const year = 1983 + Math.floor(Math.random() * 17), seed = Math.floor(Math.random() * 1e9);
+  const name = ANNEX_NAMES[seed % ANNEX_NAMES.length] + '-' + String(year).slice(2);
+  SALV.annex = { year, pais, seed, name, ids: [], filled: false, docked: false };
+  saveSalv();
+  ANNEX.def = SALV.annex; ANNEX.g = buildAnnex(SALV.annex); ANNEX.slots = annexSlots(SALV.annex);
+  ANNEX.state = 'approach'; ANNEX.t = 0; ANNEX.dur = fast ? 12 : 35; ANNEX.dz = 140;
+  ANNEX.g.position.set(3, 1.5, -ANNEX.dz); scene.add(ANNEX.g);
+  beep(440, 0.15); setTimeout(() => beep(330, 0.25), 200);
+  toast('El sonar detectó un satélite entero: el módulo ' + name + ', de ' + PAISES[pais][0] + ', con cosas de ' + year + '. Se acerca por la ventana de adelante para acoplarse.', 10000);
+  fillAnnex();
+  drawDockPanel();
+  return true;
+}
+function annexDock() {
+  ANNEX.state = 'docked'; ANNEX.dz = 0; ANNEX.g.position.set(0, 0, 0);
+  SALV.annex.docked = true; saveSalv();
+  setDocked(true); collectStruct();
+  noiseBurst(0.6, 'lowpass', 180, 0.6, 1); setTimeout(() => noiseBurst(0.25, 'bandpass', 900, 0.25, 2), 250);
+  toast('Acople completo con ' + SALV.annex.name + '. Abrí la escotilla con el botón verde, abajo de la ventana de adelante.', 9000);
+  SALV.annex.ids.forEach(placeAnnexItem);
+  if (!SALV.annex.filled) fillAnnex();
+  drawDockPanel();
+}
+function setDockDoor(open) {
+  if (ANNEX.state !== 'docked') { toast('No hay ningún módulo acoplado adelante.'); return; }
+  ANNEX.doorOpen = open; SALV.annex.doorOpen = open; saveSalv();
+  noiseBurst(0.9, 'lowpass', 400, 0.3, 0.7); drawDockPanel();
+}
+function annexUndock() {
+  if (ANNEX.state !== 'docked') { toast('No hay ningún módulo acoplado adelante.'); return; }
+  if (ANNEX.doorOpen || ANNEX.doorT > 0.05) { toast('Primero cerrá la escotilla de adelante (botón verde).'); return; }
+  if (player.pos.z < POD.z0) { toast('Volvé a nuestro módulo antes de desacoplar.'); return; }
+  // lo que quedó del otro lado se va con el módulo
+  let n = 0;
+  items.forEach((it) => {
+    if (it.gone || it.held || it.inDrive || it.g.position.z > POD.z0 - 0.15) return;
+    it.gone = true; it.stuck = false; ANNEX.g.attach(it.g); n++;
+  });
+  saveItems();
+  const name = SALV.annex.name;
+  SALV.annex = null; SALV.annexAt = Date.now() + (90 + Math.random() * 120) * 60e3; saveSalv();
+  ANNEX.state = 'leaving'; ANNEX.t = 0; ANNEX.dur = 25;
+  setDocked(false); collectStruct();
+  noiseBurst(0.5, 'lowpass', 220, 0.5, 1);
+  toast('Listo, desacoplado. ' + name + ' se aleja' + (n ? ', con ' + n + (n === 1 ? ' cosa que quedó' : ' cosas que quedaron') + ' de su lado.' : '.'), 8000);
+  drawDockPanel();
+}
+const easeOut = (k) => 1 - Math.pow(1 - k, 3);
+function updateAnnex(dt) {
+  // llega solo de vez en cuando (el tiempo acelerado también lo acerca)
+  if (!SALV.annexAt) { SALV.annexAt = Date.now() + (60 + Math.random() * 90) * 60e3; saveSalv(); }
+  if (!SALV.annex && ANNEX.state === 'none' && Date.now() >= SALV.annexAt && state !== 'menu') annexArrive(false);
+  const on = ANNEX.state === 'none' ? 0 : 1;
+  ANNEX.lights.forEach((l) => { l.intensity = 0.9 * on; l.position.z = (l.userData.z0 = l.userData.z0 != null ? l.userData.z0 : l.position.z) - ANNEX.dz; });
+  if (ANNEX.state === 'approach') {
+    ANNEX.t += dt;
+    const k = clamp(ANNEX.t / ANNEX.dur, 0, 1), e = easeOut(k);
+    ANNEX.dz = 140 * (1 - e);
+    ANNEX.g.position.set(3 * (1 - e), 1.5 * (1 - e), -ANNEX.dz);
+    ANNEX.g.rotation.z = 0.25 * (1 - e);
+    if (k >= 1) annexDock();
+  } else if (ANNEX.state === 'leaving') {
+    ANNEX.t += dt;
+    const k = clamp(ANNEX.t / ANNEX.dur, 0, 1), e = k * k;
+    ANNEX.dz = 160 * e;
+    ANNEX.g.position.set(-2 * e, 2 * e, -ANNEX.dz); ANNEX.g.rotation.z = -0.3 * e;
+    if (k >= 1) {
+      scene.remove(ANNEX.g);
+      ANNEX.g.traverse((m) => { if (m.isMesh) { m.geometry.dispose(); const ms = Array.isArray(m.material) ? m.material : [m.material]; ms.forEach((mm) => { if (mm !== glassMat) { if (mm.map) mm.map.dispose(); mm.dispose(); } }); } });
+      ANNEX.g = null; ANNEX.state = 'none'; ANNEX.dz = 0;
+    }
+  }
+  ANNEX.doorT += ((ANNEX.doorOpen ? 1 : 0) - ANNEX.doorT) * Math.min(1, dt * 2.5);
+  if (Math.abs(ANNEX.doorT - (ANNEX.doorOpen ? 1 : 0)) < 0.004) ANNEX.doorT = ANNEX.doorOpen ? 1 : 0;
+  dockDoor.position.x = ANNEX.doorT * 1.75;
+  ANNEX.panelT += dt;
+  if (ANNEX.panelT > 0.5 && ANNEX.state !== 'none') { ANNEX.panelT = 0; drawDockPanel(); }
+}
+// adelante del módulo: la pared, o el paso por la escotilla hasta el otro módulo
+function frontLimit(p, v, r, pad, bounce) {
+  const zf = POD.z0 + pad + r;
+  if (ANNEX.state !== 'docked') { if (p.z < zf) { p.z = zf; v.z = Math.abs(v.z) * bounce; } return; }
+  const zb = ANNEX.z1 - pad - r, open = ANNEX.doorT > 0.9;
+  const dx = p.x, dy = p.y - POD.C, rad = Math.hypot(dx, dy);
+  // cerca del hueco, lo que se acerca se centra solo para poder pasar
+  if (open && p.z < zf + 0.8 && p.z > zb - 0.8 && rad < DOCK.r + 0.45 && rad > 0.02) { p.x -= dx * 0.12; p.y -= dy * 0.12; }
+  if (p.z >= zf) return;
+  if (p.z <= zb) {
+    const za = ANNEX.z0 + pad + r;
+    if (p.z < za) { p.z = za; v.z = Math.abs(v.z) * bounce; }
+    const d = annexDesk();
+    if (p.z > d.za - r && p.z < d.zb + r && p.x > d.x - r) {
+      if (p.y < d.top + r && p.y > d.top - 0.25) { p.y = d.top + r; if (v.y < 0) v.y = -v.y * bounce; }
+      else if (p.y <= d.top - 0.25 || (p.y < d.top + 0.5 + r && p.x > d.x + 0.1 - r)) { p.x = Math.min(p.x, (p.y <= d.top - 0.25 ? d.x : d.x + 0.1) - r); v.x = -Math.abs(v.x) * bounce; }
+    }
+    return;
+  }
+  const pass = open && Math.hypot(p.x, p.y - POD.C) < DOCK.r - r * 0.5;
+  if (!pass) {
+    if (p.z > (zf + zb) / 2) { p.z = zf; v.z = Math.abs(v.z) * bounce; } else { p.z = zb; v.z = -Math.abs(v.z) * bounce; }
+  } else {
+    const rr = Math.hypot(p.x, p.y - POD.C), lim = DOCK.r - r;
+    if (rr > lim) { const k = lim / rr; p.x *= k; p.y = POD.C + (p.y - POD.C) * k; }
+  }
+}
+// si al cargar ya había uno acoplado, vuelve a estar ahí
+if (SALV.annex) {
+  ANNEX.def = SALV.annex; ANNEX.g = buildAnnex(SALV.annex); ANNEX.slots = annexSlots(SALV.annex); scene.add(ANNEX.g);
+  ANNEX.state = 'docked'; SALV.annex.docked = true; ANNEX.doorOpen = !!SALV.annex.doorOpen; ANNEX.doorT = ANNEX.doorOpen ? 1 : 0;
+  SALV.annex.filling = false;
+  setDocked(true);
+}
+drawDockPanel();
+
 const targets = [
   { objs: [screen, kbBody, ...S1.macParts], label: () => 'usar la computadora (F: moverla)', act: () => enterTerminal(S1) },
   ...STATIONS.map((st) => ({ objs: [st.drivePanel], label: () => driveLabel(st), act: () => driveAction(st) })),
@@ -4984,6 +5466,8 @@ const targets = [
   { objs: [btnCapture, sonarPanel], label: () => { const c = contact(); return c && c.inZone ? 'capturar los restos de ' + c.year : 'usar el sonar'; }, act: () => sonarCapture() },
   { objs: [btnNet], label: () => 'recoger la red (' + Math.floor(netProgress() * 100) + '%)', act: () => collectNet() },
   { objs: [btnNav], label: () => traveling() ? 'rumbo: en viaje a ' + franjaTxt(SALV.nav.to) + ' (faltan ' + fmtSim(travelLeft()) + ')' : 'cambiar de franja del anillo (ahora ' + franjaTxt(navAt()) + ')', act: () => openNav() },
+  { objs: [btnDockDoor], label: () => ANNEX.state !== 'docked' ? 'escotilla de adelante (no hay nada acoplado)' : ANNEX.doorOpen ? 'cerrar la escotilla de adelante' : 'abrir la escotilla hacia ' + SALV.annex.name, act: () => setDockDoor(!ANNEX.doorOpen) },
+  { objs: [btnUndock, dockPanel], label: () => ANNEX.state === 'docked' ? 'desacoplar el módulo ' + SALV.annex.name : ANNEX.state === 'approach' ? 'acople: se acerca ' + SALV.annex.name : 'acople delantero (vacío)', act: () => annexUndock() },
   { objs: [btnSignal], label: () => 'registrar señales (direcciones de archive.org por año)', act: () => openLinks() }
 ];
 const targetOf = new Map();
@@ -5028,7 +5512,7 @@ function setUI() {
   if (state !== 'walk') hint.hidden = true;
   if (state === 'paused') {
     veil.hidden = false; veil.classList.add('clear');
-    $('enter').textContent = 'Seguir'; $('enter').disabled = false;
+    $('enter').textContent = 'Seguir'; syncEnter();
     $('progress').textContent = 'En pausa. El planeta sigue girando.';
   } else if (state !== 'menu') veil.hidden = true;
 }
@@ -5253,7 +5737,7 @@ async function importGame(file, data = null) {
 $('saveFile').addEventListener('click', exportGame);
 $('loadFile').addEventListener('click', () => $('loadInput').click());
 // limpiar satélite: borra la partida de este navegador y deja el módulo como al principio (se quedan las preferencias)
-const KEEP_PREFS = ['orbita.pais', 'orbita.aoRandom', 'orbita.hints', 'orbita.comfort', 'orbita.screen3d', 'orbita.tone1', 'orbita.tone2', 'orbita.musicVol', 'orbita.muted', 'orbita.lootPick'];
+const KEEP_PREFS = ['orbita.avisoOk', 'orbita.pais', 'orbita.aoRandom', 'orbita.hints', 'orbita.comfort', 'orbita.screen3d', 'orbita.tone1', 'orbita.tone2', 'orbita.musicVol', 'orbita.muted', 'orbita.lootPick'];
 async function cleanSatellite() {
   const msg = $('progress');
   if (!confirm('Limpiar el satélite borra la partida de este navegador: los restos, los objetos, los disquetes y lo que grabaste en las computadoras. El módulo vuelve a estar como al principio. ¿Seguir?')) return;
@@ -5638,7 +6122,10 @@ window.addEventListener('keydown', (e) => {
       $('speedLine').textContent = timeScale === 0 ? 'Órbita detenida · T para seguir' : 'Tiempo acelerado ×30';
     }
     if (e.code === 'KeyM') toggleMute();
-    if (e.code === 'KeyF' && state === 'walk') {
+    // la F de IDKFA no tiene que agarrar ni abrir nada (si no, el truco se corta a la mitad)
+    if (e.key && e.key.length === 1) cheatKey(e.key);
+    const inCheat = /idkf$/.test(cheatBuf);
+    if (e.code === 'KeyF' && state === 'walk' && !inCheat) {
       const mst = !held.it && aimed && aimed.target && STATIONS.find((st) => aimed.target.objs.includes(st.screen));
       if (MAC.moving) dropMac();
       else if (mst) startMoveMac(mst);
@@ -5648,7 +6135,6 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyP') deckAction('play');
     if (e.code === 'KeyX' && state === 'walk') discardItem();
     if (e.code === 'KeyZ' && state === 'walk') undoDiscard();
-    if (e.key && e.key.length === 1) cheatKey(e.key);
     if (e.code === 'KeyR' && state === 'walk') { const m = held.it && held.it.kind === 'magazine' ? held.it : aimed && aimed.item && aimed.item.kind === 'magazine' ? aimed.item : null; if (m) { if (held.it) releaseItem(); openReader(m); } }
   }
 });
@@ -5678,8 +6164,8 @@ function playerConstrain(p, v) {
       const vn = v.x * n.x + v.y * n.y; if (vn > 0) { v.x -= 1.2 * vn * n.x; v.y -= 1.2 * vn * n.y; }
     }
   }
-  const zMin = POD.z0 + r, zMax = POD.z1 - r - 0.1;
-  if (p.z < zMin) { p.z = zMin; v.z = Math.max(0, v.z) * 0.2; }
+  const zMax = POD.z1 - r - 0.1;
+  frontLimit(p, v, r, 0, 0.2);
   // la tela de la pantalla, si está baja, no se atraviesa
   if (!PROJ.free && PROJ.t > 0.3 && Math.abs(p.x) < PROJ.hw + 0.1 && p.y < PROJ.top + 0.1 && p.y > PROJ.top - PROJ.h * PROJ.t - 0.1) {
     const side = Math.sign(player.lastZ - PROJ.z || 1);
@@ -5757,18 +6243,56 @@ const DEBRIS = { flow: new THREE.Vector3(), list: [], meshes: [], dust: null, HA
   DEBRIS.flow.crossVectors(axis, up).negate().normalize(); // earthSpin gira en sentido negativo
   DEBRIS.up = up;
   const rnd = mulberry(4242);
-  // roca: un icosaedro abollado, con cada vértice corrido un poco
-  function rockGeo() {
-    const g = new THREE.IcosahedronGeometry(1, 1), pa = g.attributes.position, r2 = mulberry(77), seen = new Map(), v = new THREE.Vector3();
+  // roca: una esfera deformada con ruido, aplastada, con cráteres y el color manchado (polvo claro, partes oscuras)
+  function rockGeo(seed) {
+    const g = new THREE.IcosahedronGeometry(1, 4);
+    const pa = g.attributes.position, r2 = mulberry(seed), v = new THREE.Vector3(), cache = new Map();
+    const o = [r2() * 50, r2() * 50, r2() * 50], sq = [0.75 + r2() * 0.5, 0.6 + r2() * 0.4, 0.8 + r2() * 0.4];
+    const craters = [];
+    for (let k = 0; k < 9; k++) { const c = new THREE.Vector3(r2() - 0.5, r2() - 0.5, r2() - 0.5).normalize(); craters.push([c, 0.12 + Math.pow(r2(), 2) * 0.45]); }
+    const cols = new Float32Array(pa.count * 3);
     for (let i = 0; i < pa.count; i++) {
-      v.fromBufferAttribute(pa, i); const k = v.toArray().map((n) => n.toFixed(3)).join();
-      if (!seen.has(k)) seen.set(k, 0.7 + r2() * 0.5);
-      v.multiplyScalar(seen.get(k)); pa.setXYZ(i, v.x, v.y, v.z);
+      v.fromBufferAttribute(pa, i); const key = v.toArray().map((n) => n.toFixed(4)).join();
+      if (!cache.has(key)) {
+        const n = v.clone().normalize();
+        let h = 1 + (fbm(n.x * 1.6 + o[0], n.y * 1.6 + o[1], n.z * 1.6 + o[2], 3) - 0.5) * 0.9
+                  + (fbm(n.x * 6 + o[1], n.y * 6 + o[2], n.z * 6 + o[0], 3) - 0.5) * 0.18;
+        let crat = 0;
+        for (const [c, r] of craters) {
+          const d = Math.acos(clamp(n.dot(c), -1, 1)) / r;
+          if (d < 1.4) { const bowl = d < 1 ? (d * d - 1) * 0.6 : 0, rim = Math.exp(-Math.pow((d - 1) * 4, 2)) * 0.12; h += (bowl + rim) * r * 0.5; if (d < 1) crat = Math.max(crat, 1 - d); }
+        }
+        // color: gris pardo con manchas, fondo de cráter más oscuro, partes altas con polvo claro
+        const m = fbm(n.x * 4 + 9, n.y * 4, n.z * 4 + o[2], 3), grain = fbm(n.x * 22, n.y * 22 + o[0], n.z * 22, 2);
+        let b = 0.55 + (m - 0.5) * 0.9 + (grain - 0.5) * 0.35 - crat * 0.25 + (h - 1) * 0.5;
+        b = clamp(b, 0.18, 1.1);
+        cache.set(key, [h, b * (0.98 + (m - 0.5) * 0.15), b, b * (0.94 - (m - 0.5) * 0.1)]);
+      }
+      const [h, cr, cg, cb] = cache.get(key);
+      v.normalize().multiplyScalar(h); v.set(v.x * sq[0], v.y * sq[1], v.z * sq[2]);
+      pa.setXYZ(i, v.x, v.y, v.z); cols.set([cr, cg, cb], i * 3);
     }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    // normales suaves: la geometría trae los vértices repetidos por cara, se promedian por posición
     g.computeVertexNormals();
+    const na = g.attributes.normal, acc = new Map(), a = new THREE.Vector3();
+    const key = (i) => [pa.getX(i), pa.getY(i), pa.getZ(i)].map((n) => n.toFixed(4)).join();
+    for (let i = 0; i < pa.count; i++) { const k = key(i); if (!acc.has(k)) acc.set(k, new THREE.Vector3()); acc.get(k).add(a.fromBufferAttribute(na, i)); }
+    for (let i = 0; i < pa.count; i++) { a.copy(acc.get(key(i))).normalize(); na.setXYZ(i, a.x, a.y, a.z); }
     return g;
   }
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.05, roughness: 0.95, flatShading: true });
+  // grano fino de la superficie: un mapa de relieve con picaduras y piedritas
+  const rockBump = canvasTex(512, 256, (x, w, h) => {
+    const im = x.createImageData(w, h), r3 = mulberry(9);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const u = i / w * Math.PI * 2, t = j / h * Math.PI, nx = Math.sin(t) * Math.cos(u), ny = Math.cos(t), nz = Math.sin(t) * Math.sin(u);
+      const val = 128 + (fbm(nx * 18, ny * 18, nz * 18, 4) - 0.5) * 200 + (noise3(nx * 90, ny * 90, nz * 90) - 0.5) * 60;
+      const k = (j * w + i) * 4; im.data[k] = im.data[k + 1] = im.data[k + 2] = clamp(val, 0, 255); im.data[k + 3] = 255;
+    }
+    x.putImageData(im, 0, 0);
+    for (let k = 0; k < 260; k++) { const cx = r3() * w, cy = r3() * h, rr = 1 + Math.pow(r3(), 3) * 7; const gr = x.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, 'rgba(0,0,0,0.6)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0.15)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.fill(); }
+  });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: 0.0, roughness: 1.0, bumpMap: rockBump, bumpScale: 0.035, map: rockBump });
   const mats = [
     new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.45 }),
     new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.85, roughness: 0.3 })
@@ -5777,14 +6301,16 @@ const DEBRIS = { flow: new THREE.Vector3(), list: [], meshes: [], dust: null, HA
     [new THREE.IcosahedronGeometry(1, 0), 70, 0.04, 0.3, mats[0]],      // pedazos de casco
     [new THREE.BoxGeometry(1, 0.05, 0.7), 40, 0.12, 0.7, mats[1]],      // chapas y aislante dorado
     [new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6), 24, 0.2, 0.9, mats[0]], // tubos y antenas rotas
-    [rockGeo(), 34, 0.25, 2.2, rockMat]                                      // rocas, pedacitos de asteroide
+    [rockGeo(77), 12, 0.25, 2.2, rockMat],                                   // rocas, pedacitos de asteroide (tres formas)
+    [rockGeo(131), 11, 0.25, 2.2, rockMat],
+    [rockGeo(203), 11, 0.25, 2.2, rockMat]
   ];
   const tints = [0x8a8f96, 0x6d7076, 0xc9a24a, 0xd8d6cc, 0x3a3c40, 0xb08a3a];
-  const rockTints = [0x5a524a, 0x6e665c, 0x4a4540, 0x7a6e60, 0x3e3a36];
+  const rockTints = [0x8a8076, 0x9a9184, 0x76706a, 0xa09080, 0x6a6560];
   const col = new THREE.Color();
   shapes.forEach(([geo, n, s0, s1, mat]) => {
     const m = new THREE.InstancedMesh(geo, mat, n);
-    m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false;
+    m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.userData.rock = mat === rockMat;
     for (let i = 0; i < n; i++) {
       const sc = s0 + Math.pow(rnd(), 2) * (s1 - s0);
       const d = { m, i, p: new THREE.Vector3(), v: 0, q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6, rnd() * 6, rnd() * 6)),
@@ -5859,6 +6385,10 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
   simTime += dt * timeScale;
+  if (timeScale > 1) { // el tiempo acelerado también acerca el sonar y llena la red
+    const k = dt * (timeScale - 1) * 1000; SALV.netStart -= k; if (SALV.lastSonar) SALV.lastSonar -= k; if (SALV.annexAt) SALV.annexAt -= k;
+    if ((salvSaveT = (salvSaveT || 0) + dt) > 5) { salvSaveT = 0; saveSalv(); }
+  }
   updateOrbit();
   updateDebris(dt * Math.min(timeScale, 8));
   earthUniforms.cloudShift.value = clouds.rotation.y / (Math.PI * 2);
@@ -5920,6 +6450,7 @@ function frame() {
   // envíos y esclusa (cada parte por separado: si una falla, las demás siguen andando)
   if (state !== 'menu') realTime += dt;
   safe('esclusa', () => updateHatch(dt));
+  safe('acople', () => updateAnnex(dt));
   safe('sonar', () => { updateTravel(dt); updateSonar(dt); });
   if (!SALV.hinted && realTime > 40 && state === 'walk') { SALV.hinted = true; saveSalv(); beep(660, 0.12); toast('El sonar detectó restos de otro satélite. Está junto a la escotilla del fondo: esperá a que el punto entre en la zona naranja y capturalo.', 9000); }
   safe('objetos', () => { updateHeld(dt); updateItems(dt); });
@@ -5982,6 +6513,7 @@ loadManifest().then((hasManifest) => {
     const m = /^(?:disk|box):(.+)$/.exec(id);
     if (m && DISKS[m[1]] && !itemById('disk:' + m[1]) && !(itemState['disk:' + m[1]] || {}).gone) makeDisk(m[1], 0, new THREE.Vector3(0.2, 1.3, -1.2));
   });
+  if (SALV.annex) { SALV.annex.ids.forEach(placeAnnexItem); if (!SALV.annex.filled) fillAnnex(); }
   saveSalv(); drawAirPanel(); drawSonar();
 });
 STATIONS.forEach((st) => drawDrive(st));
@@ -6002,12 +6534,21 @@ function setEarth({ dayC, nightC, cloudC, heightC }) {
   cloudUniforms.cloudTex.value = ct;
   old.forEach((t) => t && t.dispose());
 }
+// para entrar hay que marcar «Entiendo» debajo del aviso sobre el contenido (queda marcado en este navegador)
+let earthReady = false;
+function syncEnter() {
+  const ok = $('avisoOk').checked, btn = $('enter');
+  btn.disabled = !(earthReady && ok);
+  if (earthReady && state !== 'paused') $('progress').textContent = ok ? 'Listo. El planeta está del otro lado de las ventanas.' : 'Marcá «Entiendo» debajo del aviso para entrar.';
+}
+$('avisoOk').checked = !!store.get('orbita.avisoOk', false);
+$('avisoOk').addEventListener('change', () => { store.set('orbita.avisoOk', $('avisoOk').checked); syncEnter(); });
 // primero una Tierra liviana para entrar enseguida; la de alta resolución llega después
 $('progress').textContent = 'Generando el planeta…';
 makeEarthTextures(512, 256).then((t) => {
   setEarth(t);
-  $('progress').textContent = 'Listo. El planeta está del otro lado de las ventanas.';
-  const btn = $('enter'); btn.disabled = false; btn.focus();
+  earthReady = true; syncEnter();
+  if (!$('enter').disabled) $('enter').focus();
   const t0 = performance.now();
   // la Tierra de verdad: imágenes Blue Marble de la NASA (dominio público) que viajan con el juego
   const L = new THREE.TextureLoader();
