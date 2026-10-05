@@ -59,6 +59,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 #lList { max-height: 30vh; overflow: auto; display: grid; gap: 4px; font-size: 18px; color: #c9b896; }
 #lList .lrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #lList .lrow .cbtn { padding: 0 8px; font-size: 16px; }
+#screenUI .cbox { width: min(640px, 100%); }
 #readerUI .cbox { width: min(1200px, 100%); max-height: calc(100vh - 32px); overflow: auto; gap: 8px; padding: 14px 20px; }
 #readerUI .rpages { display: flex; justify-content: center; gap: 2px; height: min(calc(100vh - 210px), 1000px); min-height: 240px; }
 #readerUI canvas { height: 100%; max-width: 50%; object-fit: contain; background: #e9e1cf; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6); }
@@ -74,10 +75,15 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .pad button { font: 500 13px var(--mono); color: var(--hull); background: var(--panel); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 6px; padding: 14px 16px; touch-action: none; user-select: none; -webkit-user-select: none; }
 .pad button.use { color: var(--phosphor); border-color: rgba(255, 179, 65, 0.5); }
 
-#veil { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: radial-gradient(120% 90% at 50% 110%, rgba(30, 60, 110, 0.35), rgba(5, 7, 12, 0.92) 60%); }
+#veil { position: fixed; inset: 0; display: flex; padding: 16px; overflow-y: auto; background: radial-gradient(120% 90% at 50% 110%, rgba(30, 60, 110, 0.35), rgba(5, 7, 12, 0.92) 60%); }
 #veil.clear { background: rgba(5, 7, 12, 0.35); }
-.card { width: min(440px, 100%); display: grid; gap: 18px; }
-.card h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(28px, 7vw, 44px); letter-spacing: 0.28em; color: var(--hull); text-wrap: balance; }
+.card { margin: auto; width: min(880px, 100%); display: grid; gap: 14px; }
+.card .top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.card .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 32px; align-items: start; }
+.card .col { display: grid; gap: 14px; }
+.card .go { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+@media (max-width: 720px) { .card .cols { grid-template-columns: 1fr; } }
+.card h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 6vw, 38px); letter-spacing: 0.28em; color: var(--hull); text-wrap: balance; }
 .card .sub { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.6; }
 .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 12px; color: var(--dim); }
 .card dt { color: var(--hull); }
@@ -92,9 +98,10 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .btn[disabled] { background: #3a3426; color: var(--dim); cursor: default; }
 .card .partida { display: grid; gap: 8px; font-size: 12px; color: var(--dim); line-height: 1.55; }
 .card .partida p { margin: 0; }
-.card .aviso { margin: 0; font-size: 11px; color: var(--dim); line-height: 1.55; border-left: 2px solid rgba(255, 179, 65, 0.5); padding-left: 10px; }
+.card .aviso { margin: 0; font-size: 10.5px; color: var(--dim); line-height: 1.55; border-left: 2px solid rgba(255, 179, 65, 0.5); padding-left: 10px; }
 .card .partida .row { display: flex; flex-wrap: wrap; gap: 8px; }
 .card .partida button { font: 12px var(--mono); color: var(--hull); background: rgba(10, 14, 22, 0.8); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.card .partida button.danger { border-color: rgba(255, 120, 90, 0.45); color: #f0b0a0; }
 .card .partida button:hover, .card .partida button:focus-visible { border-color: var(--hull); outline: none; }
 #progress { font-size: 12px; color: var(--signal); font-variant-numeric: tabular-nums; min-height: 1.4em; }
 
@@ -217,9 +224,18 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 
 <div id="veil">
   <div class="card">
-    <h1>ÓRBITA</h1>
+    <div class="top">
+      <h1>ÓRBITA</h1>
+      <nav class="links" aria-label="Enlaces">
+      <a id="lnkDonar" href="https://cafecito.app/orbita-game" target="_blank" rel="noopener">☕ Buy me a coffee (Cafecito)</a>
+      <a id="lnkContacto" href="#" target="_blank" rel="noopener" hidden>✉ Contact</a>
+      <a id="lnkLang" href="./" hreflang="es" lang="es">Español</a>
+    </nav>
+    </div>
     <p class="sub">Prototype 1. You are an observer from another civilization, orbiting Earth. You rescue salvage from satellites that exploded decades ago, carrying what Earthlings were making that year: games, films, music, magazines. There's no way to lose.</p>
-    <dl>
+    <div class="cols">
+      <div class="col">
+        <dl>
       <dt>Look</dt><dd>mouse (or drag your finger)</dd>
       <dt>Float</dt><dd>W A S D, Q up, E down</dd>
       <dt>Objects</dt><dd>click to grab and drop, middle button to throw</dd>
@@ -228,24 +244,25 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <dt>Time</dt><dd>T speeds up the orbit ×30</dd>
       <dt>Music</dt><dd>the cassette deck, at the back on the right (P)</dd>
     </dl>
-    <div class="origin">
+        <div class="origin">
       <label for="pais">Region you're studying</label><select id="pais"></select>
       <label class="chk"><input type="checkbox" id="aoRandom"> Random salvage from archive.org (needs internet)</label>
       <label class="chk"><input type="checkbox" id="showHints"> Show what things do when you aim at them</label>
     </div>
-    <div class="partida">
+      </div>
+      <div class="col">
+        <div class="partida">
       <p>Your game is saved in this browser. If you switch browsers or clear your history, the game starts over. Every game is unique: no two players necessarily get the same content.</p>
-      <div class="row"><button type="button" id="saveFile">Save the game to a file</button><button type="button" id="loadFile">Load a game</button><button type="button" id="loadStart">Start from the sample save</button></div>
+      <div class="row"><button type="button" id="saveFile">Save the game to a file</button><button type="button" id="loadFile">Load a game</button><button type="button" id="loadStart">Start from the sample save</button><button type="button" id="cleanSat" class="danger">Clean satellite</button></div>
       <input type="file" id="loadInput" accept=".json,application/json" hidden>
     </div>
-    <p class="aviso">Notice: salvage items are real period materials (magazines, films, music, posters, photos and software) that arrive at random from public archives such as archive.org and Wikimedia Commons. They are not reviewed one by one, so they may include nudity, violence, strong language or other adult content. Intended for ages 18+. Each item belongs to its authors and does not reflect the views of the game's creator.</p>
-    <div id="progress">Generating Earth…</div>
-    <button class="btn" id="enter" disabled>Enter the module</button>
-    <nav class="links" aria-label="Enlaces">
-      <a id="lnkDonar" href="https://cafecito.app/orbita-game" target="_blank" rel="noopener">☕ Buy me a coffee (Cafecito)</a>
-      <a id="lnkContacto" href="#" target="_blank" rel="noopener" hidden>✉ Contact</a>
-      <a id="lnkLang" href="./" hreflang="es" lang="es">Español</a>
-    </nav>
+        <p class="aviso">Notice: salvage items are real period materials (magazines, films, music, posters, photos and software) that arrive at random from public archives such as archive.org and Wikimedia Commons. They are not reviewed one by one, so they may include nudity, violence, strong language or other adult content. Intended for ages 18+. Each item belongs to its authors and does not reflect the views of the game's creator.</p>
+      </div>
+    </div>
+    <div class="go">
+      <button class="btn" id="enter" disabled>Enter the module</button>
+      <div id="progress">Generating Earth…</div>
+    </div>
   </div>
 </div>
 
@@ -4515,6 +4532,21 @@ async function importGame(file, data = null) {
 }
 $('saveFile').addEventListener('click', exportGame);
 $('loadFile').addEventListener('click', () => $('loadInput').click());
+// limpiar satélite: borra la partida de este navegador y deja el módulo como al principio (se quedan las preferencias)
+const KEEP_PREFS = ['orbita.pais', 'orbita.aoRandom', 'orbita.hints', 'orbita.comfort', 'orbita.screen3d', 'orbita.tone1', 'orbita.tone2', 'orbita.musicVol', 'orbita.muted'];
+async function cleanSatellite() {
+  const msg = $('progress');
+  if (!confirm('Cleaning the satellite erases the game in this browser: the salvage, the objects, the floppies and whatever you saved on the computers. The pod goes back to how it was at the start. Continue?')) return;
+  msg.textContent = 'Cleaning the satellite…';
+  try {
+    store.frozen = true; idb.freeze();
+    [S1, S2].forEach((st) => { if (st.pc.ci) { try { st.pc.ci.exit(); } catch (e) {} } });
+    Object.keys(localStorage).filter((k) => k.startsWith('orbita.') && !KEEP_PREFS.includes(k)).forEach((k) => localStorage.removeItem(k));
+    for (const k of await idb.keys()) if (!String(k).startsWith('cpack:')) await idb.del(k);
+    location.reload();
+  } catch (e) { console.warn('limpiar', e); msg.textContent = 'Could not clean the satellite. Reload the page.'; }
+}
+$('cleanSat').addEventListener('click', cleanSatellite);
 // partida armada de antemano, con restos ya juntados, que viaja junto al juego
 $('loadStart').addEventListener('click', async () => {
   let data = null;
