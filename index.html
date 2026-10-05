@@ -132,7 +132,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div class="hud" id="hint" hidden>Clic para usar la computadora</div>
 <div class="hud" id="help" hidden>
   <kbd>W A S D</kbd> flotar · <kbd>Q</kbd> subir · <kbd>E</kbd> bajar · <kbd>Shift</kbd> más rápido · <kbd>mouse</kbd> mirar<br>
-  clic agarra y suelta objetos · <kbd>botón del medio</kbd> lo tira (cuanto más lo apretás, más fuerte) · ruedita acerca o aleja lo que tenés<br>
+  clic agarra y suelta objetos · <kbd>botón del medio</kbd> lo tira (más apretado, más fuerte) · ruedita acerca o aleja<br>
   <kbd>botón derecho</kbd> + mouse gira lo que tenés · + ruedita lo inclina<br>
   clic en la computadora para usarla · <kbd>Esc</kbd> levantarte<br>
   <kbd>T</kbd> acelerar o detener el tiempo · <kbd>R</kbd> leer una revista · <kbd>L</kbd> luces · <kbd>P</kbd> música · <kbd>M</kbd> sonido<br>
@@ -1386,7 +1386,7 @@ function makeCassetteMesh(label) {
   g.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.012, 0.064), [side, side, face, side, side, side]));
   return g;
 }
-function makeVhsMesh(label) {
+function makeVhsMesh(label, coverUrl) {
   const g = new THREE.Group();
   const t = canvasTex(256, 140, (x, w, h) => {
     x.fillStyle = '#121214'; x.fillRect(0, 0, w, h);
@@ -1396,7 +1396,36 @@ function makeVhsMesh(label) {
   });
   const side = new THREE.MeshStandardMaterial({ color: 0x121214, roughness: 0.5 });
   const face = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5 });
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.025, 0.104), [side, side, face, side, side, side]));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.025, 0.104), [side, side, face, side, side, side]);
+  g.add(body);
+  // si hay imagen de la película, el VHS llega en su caja de cartón con esa tapa
+  if (coverUrl) loadImageTex(/^https?:/i.test(coverUrl) ? [coverUrl, viaProxy(coverUrl)] : [coverUrl]).then((t) => {
+    const img = t.image;
+    if (!img || img.width < 80 || img.height < 80) { t.dispose(); return; }
+    const W = 280, H = 512, IH = 446;
+    const front = canvasTex(W, H, (x) => {
+      x.fillStyle = '#0c0c0e'; x.fillRect(0, 0, W, H);
+      const A = W / IH, a = img.width / img.height;
+      let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      if (a > A) { sw = sh * A; sx = (img.width - sw) / 2; } else { sh = sw / A; sy = (img.height - sh) / 2; }
+      x.drawImage(img, sx, sy, sw, sh, 0, 0, W, IH);
+      x.fillStyle = '#f2efe6'; let fs = 24; x.font = 'bold ' + fs + 'px "Courier Prime", monospace';
+      while (x.measureText(label).width > W - 70 && fs > 12) { fs -= 1; x.font = 'bold ' + fs + 'px "Courier Prime", monospace'; }
+      x.fillText(label, 12, IH + 40);
+      x.fillStyle = '#8a93a0'; x.font = '15px monospace'; x.fillText('VHS', W - 46, IH + 40);
+    });
+    const spine = canvasTex(512, 64, (x, w, h) => {
+      x.fillStyle = '#0c0c0e'; x.fillRect(0, 0, w, h);
+      x.fillStyle = '#f2efe6'; x.font = 'bold 30px "Courier Prime", monospace'; x.fillText(label, 16, 42);
+    });
+    const card = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.7 });
+    const spineMat = new THREE.MeshStandardMaterial({ map: spine, roughness: 0.6 });
+    body.geometry.dispose();
+    // la caja va parada: el lado largo es el de arriba a abajo, como la tapa (en una pared, -z es arriba)
+    body.geometry = new THREE.BoxGeometry(0.112, 0.032, 0.2);
+    body.material = [spineMat, spineMat, new THREE.MeshStandardMaterial({ map: front, roughness: 0.45 }), card, card, card];
+    t.dispose(); g.userData.sleeve = true;
+  }).catch(() => {});
   return g;
 }
 function drawCieloCover(x, w, h) {
@@ -1774,7 +1803,9 @@ function registerEntry(year, cat, e0) {
     } });
   } else if (cat === 'videos') {
     const id = 'vhs:' + h;
-    addEntry({ name: name0, id, year, kind: 'video', make: () => { unlockVhs({ name: name0 + ' (' + year + ')', url: src }); return addItem(id, 'vhs', makeVhsMesh(name0.toUpperCase().slice(0, 16)), new THREE.Vector3(), { radius: 0.02, label: 'el VHS ' + name0 }); } });
+    // la caja: la tapa que venga en el envío o, si es de archive.org, la imagen de su ítem
+    const vTapa = tapa || (isArchive(src) ? 'https://archive.org/services/img/' + AO_RE.exec(src)[1] : null);
+    addEntry({ name: name0, id, year, kind: 'video', make: () => { unlockVhs({ name: name0 + ' (' + year + ')', url: src }); return addItem(id, 'vhs', makeVhsMesh(name0.toUpperCase().slice(0, 16), vTapa), new THREE.Vector3(), { radius: 0.02, label: 'el VHS ' + name0 }); } });
   } else if (cat === 'musica') {
     const id = 'tape:' + h;
     const pistas = Array.isArray(e.pistas) && e.pistas.length ? e.pistas.map((p) => (/^https?:/i.test(p) ? p : 'envios/' + ys + '/' + p)) : null;
