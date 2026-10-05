@@ -22,7 +22,7 @@
 html, body { height: 100%; }
 body { background: var(--void); color: var(--hull); font-family: var(--mono); overflow: hidden; }
 #stage { position: fixed; inset: 0; }
-#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#stage canvas { position: relative; display: block; width: 100%; height: 100%; touch-action: none; }
 
 .hud { position: fixed; pointer-events: none; font-size: 12px; letter-spacing: 0.04em; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 #status { top: calc(env(safe-area-inset-top, 0px) + 16px); left: 16px; display: grid; gap: 4px; }
@@ -47,6 +47,8 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .cbtn { font: 20px var(--crt); color: #e8d6b4; background: #241a10; border: 1px solid #5a4630; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 .cbtn:focus-visible, .cpanel input:focus-visible, .cpanel select:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 2px; }
 .cpanel input[type=text], .cpanel input[type=url], .cpanel input[type=number] { font: 20px var(--crt); background: #0c0906; color: #e8d6b4; border: 1px solid #5a4630; border-radius: 4px; padding: 4px 6px; width: 100%; box-sizing: border-box; }
+.cpanel .chk { display: flex; gap: 8px; align-items: center; }
+.cpanel .chk input { accent-color: var(--phosphor); width: 18px; height: 18px; }
 .cpanel .lnote { margin: 0; color: #8a7a60; font-size: 18px; }
 .nlist { display: grid; gap: 6px; } .nbtn { text-align: left; } .nbtn[aria-current] { color: var(--phosphor); border-color: var(--phosphor); }
 .mlist { margin: 0; padding: 0; list-style: none; max-height: 40vh; overflow-y: auto; border: 1px solid #3a2e20; border-radius: 4px; }
@@ -72,7 +74,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .pad button { font: 500 13px var(--mono); color: var(--hull); background: var(--panel); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 6px; padding: 14px 16px; touch-action: none; user-select: none; -webkit-user-select: none; }
 .pad button.use { color: var(--phosphor); border-color: rgba(255, 179, 65, 0.5); }
 
-#veil { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: radial-gradient(120% 90% at 50% 110%, rgba(30, 60, 110, 0.35), rgba(5, 7, 12, 0.92) 60%); }
+#veil { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; overflow-y: auto; background: radial-gradient(120% 90% at 50% 110%, rgba(30, 60, 110, 0.35), rgba(5, 7, 12, 0.92) 60%); }
 #veil.clear { background: rgba(5, 7, 12, 0.35); }
 .card { width: min(440px, 100%); display: grid; gap: 18px; }
 .card h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(28px, 7vw, 44px); letter-spacing: 0.28em; color: var(--hull); text-wrap: balance; }
@@ -88,6 +90,12 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .card .origin .chk { display: flex; gap: 8px; align-items: center; }
 .btn { justify-self: start; font: 500 14px var(--mono); letter-spacing: 0.06em; color: var(--void); background: var(--phosphor); border: 0; border-radius: 4px; padding: 12px 20px; cursor: pointer; }
 .btn[disabled] { background: #3a3426; color: var(--dim); cursor: default; }
+.card .partida { display: grid; gap: 8px; font-size: 12px; color: var(--dim); line-height: 1.55; }
+.card .partida p { margin: 0; }
+.card .aviso { margin: 0; font-size: 11px; color: var(--dim); line-height: 1.55; border-left: 2px solid rgba(255, 179, 65, 0.5); padding-left: 10px; }
+.card .partida .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.card .partida button { font: 12px var(--mono); color: var(--hull); background: rgba(10, 14, 22, 0.8); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.card .partida button:hover, .card .partida button:focus-visible { border-color: var(--hull); outline: none; }
 #progress { font-size: 12px; color: var(--signal); font-variant-numeric: tabular-nums; min-height: 1.4em; }
 
 #typer { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
@@ -111,11 +119,11 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 <div class="hud" id="hint" hidden>Click to use the computer</div>
 <div class="hud" id="help" hidden>
   <kbd>W A S D</kbd> float · <kbd>Q</kbd> up · <kbd>E</kbd> down · <kbd>Shift</kbd> faster · <kbd>mouse</kbd> look around<br>
-  click grabs and drops objects · scroll wheel brings what you hold closer or farther<br>
+  click grabs and drops things · <kbd>middle button</kbd> throws it forward · wheel brings what you hold closer or farther<br>
   <kbd>right button</kbd> + mouse turns what you hold · + scroll wheel tilts it<br>
   click the computer to use it · <kbd>Esc</kbd> get up<br>
   <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine · <kbd>L</kbd> lights · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
-  aim at a wall with a poster or painting in hand to stick it on with velcro
+  aim at a wall with something in hand to stick it with velcro · <kbd>Shift</kbd>+click drops it without sticking
 </div>
 <div class="hud" id="termHelp" hidden>
   the keyboard types on the computer · the mouse stays free<br>
@@ -130,6 +138,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   <div class="cbox">
     <h2>Comfort</h2>
     <label for="cTint">Glass opacity</label><input id="cTint" type="range" min="0" max="100">
+    <label for="cFloor">Glass floor opacity</label><input id="cFloor" type="range" min="0" max="100">
     <label for="cLight">Light intensity</label><input id="cLight" type="range" min="0" max="100">
     <label for="cWarm">Light warmth</label><input id="cWarm" type="range" min="0" max="100">
     <p style="margin:0;color:#8a7a60;font-size:18px">The video screen is adjusted from the screen itself: aim at it and click.</p>
@@ -143,6 +152,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     <div class="crow"><button id="sBack" class="cbtn" title="Rewind 10 seconds">⏪ 10 s</button><button id="sPause" class="cbtn">▶ Reproducir</button><button id="sFwd" class="cbtn" title="Forward 30 seconds">30 s ⏩</button><button id="cPlay" class="cbtn">Play</button></div>
     <input id="sPos" type="range" min="0" max="1000" value="0" aria-label="Video position"><span id="sTime" class="lnote">stopped</span>
     <label for="sVol">Volume</label><input id="sVol" type="range" min="0" max="100">
+    <label class="chk"><input type="checkbox" id="s3d"> Sound from the screen (fades as you move away)</label>
     <details class="sMore"><summary>Position and size</summary>
     <button id="cProj" class="cbtn">Bajar la pantalla</button>
     <label for="sSize">Size</label><input id="sSize" type="range" min="40" max="120">
@@ -192,7 +202,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   <div class="cbox">
     <h2 id="rTitle">Magazine</h2>
     <div class="rpages"><canvas id="rL"></canvas><canvas id="rR"></canvas><iframe id="rFrame" hidden allow="fullscreen" title="Revista"></iframe></div>
-    <div class="crow"><button id="rPrev" class="cbtn">◀ Previous</button><button id="rNext" class="cbtn">Next ▶</button><button id="rClose" class="cbtn">Close (Esc)</button><span id="rPage" style="align-self:center;color:#c9a26a"></span></div>
+    <div class="crow"><button id="rPrev" class="cbtn">◀ Previous</button><button id="rNext" class="cbtn">Next ▶</button><button id="rPosterL" class="cbtn" hidden>Poster</button><button id="rPosterR" class="cbtn" hidden>Poster</button><button id="rClose" class="cbtn">Close (Esc)</button><span id="rPage" style="align-self:center;color:#c9a26a"></span></div>
   </div>
 </div>
 <input id="videoFile" type="file" accept="video/*" multiple hidden>
@@ -212,7 +222,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     <dl>
       <dt>Look</dt><dd>mouse (or drag your finger)</dd>
       <dt>Float</dt><dd>W A S D, Q up, E down</dd>
-      <dt>Objects</dt><dd>click to grab and drop</dd>
+      <dt>Objects</dt><dd>click to grab and drop, middle button to throw</dd>
       <dt>Program</dt><dd>click the computer</dd>
       <dt>Get up</dt><dd>Esc</dd>
       <dt>Time</dt><dd>T speeds up the orbit ×30</dd>
@@ -221,7 +231,14 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
     <div class="origin">
       <label for="pais">Region you're studying</label><select id="pais"></select>
       <label class="chk"><input type="checkbox" id="aoRandom"> Random salvage from archive.org (needs internet)</label>
+      <label class="chk"><input type="checkbox" id="showHints"> Show what things do when you aim at them</label>
     </div>
+    <div class="partida">
+      <p>Your game is saved in this browser. If you switch browsers or clear your history, the game starts over. Every game is unique: no two players necessarily get the same content.</p>
+      <div class="row"><button type="button" id="saveFile">Save the game to a file</button><button type="button" id="loadFile">Load a game</button></div>
+      <input type="file" id="loadInput" accept=".json,application/json" hidden>
+    </div>
+    <p class="aviso">Notice: salvage items are real period materials (magazines, films, music, posters, photos and software) that arrive at random from public archives such as archive.org and Wikimedia Commons. They are not reviewed one by one, so they may include nudity, violence, strong language or other adult content. Intended for ages 18+. Each item belongs to its authors and does not reflect the views of the game's creator.</p>
     <div id="progress">Generating Earth…</div>
     <button class="btn" id="enter" disabled>Enter the module</button>
     <nav class="links" aria-label="Enlaces">
@@ -243,7 +260,8 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 const $ = (id) => document.getElementById(id);
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  set(k, v) { if (store.frozen) return; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  frozen: false
 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -363,7 +381,8 @@ function makeEarthTextures(W, H) {
 
 /* ---------- escena ---------- */
 const stage = $('stage');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// alpha: los pósters de imágenes sin CORS se ven por un agujero en el lienzo (ver HOLE)
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -564,6 +583,8 @@ function box(w, h, d, mat, x, y, z, shadow = true, parent = scene) {
 const POD = { A: 2.2, C: 2.2, z0: -4.5, z1: 4.5 };
 POD.S = 2 * POD.A * Math.tan(Math.PI / 8);
 const WINDOWS = new Set(['7:1', '7:3', '7:5', '6:1', '6:3', '6:5', '5:3', '3:6']);
+// una fila de paneles vidriados en el piso, con su propio control de opacidad
+const FLOOR_WINDOWS = new Set(['0:1', '0:3', '0:5', '0:7']);
 function faceFrame(i) {
   const th = i * Math.PI / 4;
   return { th, nx: Math.sin(th), ny: -Math.cos(th) };
@@ -573,7 +594,7 @@ for (let i = 0; i < 8; i++) {
   for (let sgi = 0; sgi < 9; sgi++) {
     const zc = POD.z0 + sgi + 0.5;
     const cx = nx * (POD.A + 0.05), cy = POD.C + ny * (POD.A + 0.05);
-    if (WINDOWS.has(i + ':' + sgi)) {
+    if (WINDOWS.has(i + ':' + sgi) || FLOOR_WINDOWS.has(i + ':' + sgi)) {
       // marco de la ventana: dos largueros y dos travesaños
       const fr = new THREE.Group(); fr.position.set(cx, cy, zc); fr.rotation.z = th; scene.add(fr);
       box(POD.S, 0.14, 0.09, matFrame, 0, 0, -0.455, true, fr);
@@ -746,10 +767,6 @@ const lamp = new THREE.PointLight(0xffc27a, 1.4, 4, 1.6);
 lamp.position.set(1.0, 1.58, -1.0);
 lamp.castShadow = true; lamp.shadow.mapSize.set(512, 512); lamp.shadow.bias = -0.002;
 scene.add(lamp);
-// asiento frente a la consola
-box(0.45, 0.07, 0.45, matCushion, 0.2, 0.48, -1.9);
-box(0.06, 0.5, 0.45, matCushion, -0.02, 0.78, -1.9);
-box(0.05, 0.44, 0.05, matDark, 0.2, 0.22, -1.9);
 
 /* ---------- objetos sueltos en gravedad cero ---------- */
 const items = [];
@@ -864,6 +881,15 @@ function releaseItem() {
   it.spin.set((Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.15);
   saveItems();
   return it;
+}
+// tirar lo que tenés hacia adelante (botón del medio): sale flotando hasta chocar con algo
+function throwHeld() {
+  const it = releaseItem();
+  if (!it) return;
+  const dir = camera.getWorldDirection(new THREE.Vector3());
+  it.vel.copy(dir).multiplyScalar(it.kind === 'crate' ? 1.6 : 2.6).addScaledVector(player.vel, 0.5);
+  it.spin.set((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
+  click();
 }
 function updateHeld(dt) {
   const it = held.it;
@@ -1312,7 +1338,6 @@ function shelfUnit(side, z0, z1) {
   [1.45, 1.9, 2.35, 2.8].forEach((y) => {
     box(depth, 0.03, z1 - z0, matFrame, (xWall + xIn) / 2, y, (z0 + z1) / 2);
     box(depth - 0.02, 0.004, z1 - z0 - 0.04, matVelcro, (xWall + xIn) / 2, y + 0.017, (z0 + z1) / 2, false);
-    box(0.012, 0.05, z1 - z0, matOrange, xIn + 0.006 * sx, y + 0.01, (z0 + z1) / 2, false);
     SHELVES.push({ x0: Math.min(xWall, xIn), x1: Math.max(xWall, xIn), z0, z1, top: y + 0.019 });
   });
   [z0, z1].forEach((z) => box(depth, 1.5, 0.03, matFrame, (xWall + xIn) / 2, 2.12, z));
@@ -1584,7 +1609,13 @@ function registerEntry(year, cat, e0) {
     addEntry({ name: name0, id: 'disk:' + dk, year, kind, make: () => makeDisk(dk, 0, new THREE.Vector3()) });
   } else if (cat === 'revistas') {
     const id = 'mag:' + h;
-    addEntry({ name: name0, id, year, kind: 'revista', make: () => addItem(id, 'magazine', makeMagazineMesh2(drawMagCover(name0, year), tapa), new THREE.Vector3(), { radius: 0.01, label: 'the magazine ' + name0, data: { half: 0.004, mag: { src, name: name0 } } }) });
+    // sin tapa: la de archive.org es su primera página; un PDF propio dibuja la suya
+    const aoTapa = !tapa && isArchive(src) ? 'https://archive.org/services/img/' + AO_RE.exec(src)[1] : null;
+    addEntry({ name: name0, id, year, kind: 'revista', make: () => {
+      const g = makeMagazineMesh2(drawMagCover(name0, year), tapa || aoTapa);
+      if (!tapa && !aoTapa && /\.pdf($|[?#])/i.test(src)) pdfCover(id, src, g.userData.coverMat);
+      return addItem(id, 'magazine', g, new THREE.Vector3(), { radius: 0.01, label: 'the magazine ' + name0, data: { half: 0.004, mag: { src, name: name0 } } });
+    } });
   } else if (cat === 'videos') {
     const id = 'vhs:' + h;
     addEntry({ name: name0, id, year, kind: 'video', make: () => { unlockVhs({ name: name0 + ' (' + year + ')', url: src }); return addItem(id, 'vhs', makeVhsMesh(name0.toUpperCase().slice(0, 16)), new THREE.Vector3(), { radius: 0.02, label: 'the VHS ' + name0 }); } });
@@ -1641,6 +1672,7 @@ async function loadManifest() {
   userLinks.forEach((l) => registerEntry(l.year, l.cat, l));
   SALV.aoEntries.forEach((l) => registerEntry(l.year, l.cat, l));
   (SALV.gens || []).forEach((g) => genDecor(g.year, g.n));
+  (SALV.mine || []).forEach(registerMine);
   return manifestLoaded;
 }
 // mientras carga (o si no hay forma de leerla) el póster muestra su título, nunca queda vacío
@@ -1677,13 +1709,70 @@ async function imageUrls(src) {
   out.push('https://archive.org/services/img/' + id);
   return [...new Set(out)];
 }
+/* imágenes que el servidor no deja usar como textura (archive.org no manda CORS):
+   un <img> común en una capa web detrás del mundo 3D, que se ve por un agujero transparente en el póster */
+const HOLE = { css: null, scene: null, list: [], p: null };
+const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending }); // escribe alfa 0: deja ver la capa de atrás
+function ensureHoleLayer() {
+  if (!HOLE.p) HOLE.p = (THREE.CSS3DRenderer ? Promise.resolve() : loadScript('lib/CSS3DRenderer.js')).then(() => {
+    const css = new THREE.CSS3DRenderer();
+    css.setSize(window.innerWidth, window.innerHeight);
+    Object.assign(css.domElement.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
+    stage.insertBefore(css.domElement, renderer.domElement);
+    window.addEventListener('resize', () => css.setSize(window.innerWidth, window.innerHeight));
+    HOLE.css = css; HOLE.scene = new THREE.Scene();
+  });
+  return HOLE.p;
+}
+function loadPlainImage(urls) {
+  return new Promise((res, rej) => {
+    const img = new Image(); let i = 0;
+    const next = () => { if (i >= urls.length) return rej(new Error('no address worked')); img.src = urls[i++]; };
+    img.onerror = next;
+    img.onload = () => (img.naturalWidth ? res(img) : next());
+    next();
+  });
+}
+function holePoster(face, img) {
+  const PX = 512, a = img.naturalWidth / img.naturalHeight;
+  const pxW = a >= 1 ? PX : Math.round(PX * a), pxH = a >= 1 ? Math.round(PX / a) : PX;
+  Object.assign(img.style, { width: pxW + 'px', height: pxH + 'px', objectFit: 'fill', filter: 'brightness(0.82) saturate(0.9)' });
+  const obj = new THREE.CSS3DObject(img);
+  obj.matrixAutoUpdate = false;
+  HOLE.scene.add(obj);
+  HOLE.list.push({ obj, face, pxW, pxH });
+  if (face.material.map) face.material.map.dispose();
+  face.material = holeMat;
+}
+const _hs = new THREE.Matrix4();
+function updateHoles() {
+  if (!HOLE.css) return;
+  HOLE.list = HOLE.list.filter((h) => {
+    let p = h.face, vis = true;
+    while (p && p !== scene) { if (!p.visible) vis = false; p = p.parent; }
+    if (!p) { HOLE.scene.remove(h.obj); return false; } // el póster ya no está en la escena
+    const prm = h.face.geometry.parameters;
+    h.obj.matrix.copy(h.face.matrixWorld).multiply(_hs.makeScale(prm.width / h.pxW, prm.height / h.pxH, 1));
+    h.obj.matrixWorldNeedsUpdate = true;
+    h.obj.visible = vis;
+    return true;
+  });
+  HOLE.css.render(HOLE.scene, camera);
+}
 function makeImagePoster(src, framed, name) {
   const g = makePosterMesh(drawPosterTitle(name, 'llegando…'), 0.4, 0.55, framed);
-  imageUrls(src).then(loadImageTex).then((t) => {
-    const a = t.image.width / t.image.height, h = a >= 1 ? 0.45 / a : 0.6, w = a >= 1 ? 0.45 : 0.6 * a;
+  const fit = (a) => {
+    const h = a >= 1 ? 0.45 / a : 0.6, w = a >= 1 ? 0.45 : 0.6 * a;
     g.children.forEach((c) => { c.scale.set(w / 0.4, 1, h / 0.55); if (c.geometry.type === 'PlaneGeometry') c.scale.set(w / 0.4, h / 0.55, 1); });
+  };
+  let urls = [];
+  imageUrls(src).then((u) => { urls = u; return loadImageTex(u); }).then((t) => {
+    fit(t.image.width / t.image.height);
     const m = g.children[0].material; if (m.map) m.map.dispose(); m.map = t; m.needsUpdate = true;
-  }).catch(() => {
+  }).catch(() => (urls.length ? Promise.all([ensureHoleLayer(), loadPlainImage(urls)]) : Promise.reject(new Error('no addresses'))).then(([, img]) => {
+    fit(img.naturalWidth / img.naturalHeight);
+    holePoster(g.children[0], img);
+  })).catch(() => {
     const m = g.children[0].material, c = document.createElement('canvas'); c.width = 370; c.height = 512;
     drawPosterTitle(name, 'damaged image')(c.getContext('2d'), c.width, c.height);
     if (m.map) m.map.dispose(); m.map = new THREE.CanvasTexture(c); m.needsUpdate = true;
@@ -2052,7 +2141,7 @@ async function commonsDecor(year) {
   const qs = [pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`].filter(Boolean);
   for (const q of qs.sort(() => Math.random() - 0.5)) {
     const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
-      + encodeURIComponent('filetype:bitmap ' + q) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=1024';
+      + encodeURIComponent('filetype:bitmap ' + q) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
     const r = await fetch(url); if (!r.ok) throw new Error(r.status);
     const pages = Object.values(((await r.json()).query || {}).pages || {}).filter((p) => p.imageinfo && p.imageinfo[0].thumburl && p.imageinfo[0].width >= 300);
     for (let tries = 0; tries < 8 && pages.length; tries++) {
@@ -2166,12 +2255,13 @@ async function openReader(it) {
   openComfort('reader');
   $('rTitle').textContent = mag.name; $('rPage').textContent = 'Abriendo…';
   ['rL', 'rR'].forEach((k) => { const c = $(k); c.width = 2; c.height = 2; });
-  READER.n = 0; READER.i = 0; const tok = ++READER.token;
+  READER.n = 0; READER.i = 0; READER.name = mag.name; const tok = ++READER.token;
+  $('rPosterL').hidden = true; $('rPosterR').hidden = true;
   const fr = $('rFrame'); fr.hidden = true; fr.src = 'about:blank'; $('rL').hidden = false; $('rR').hidden = false; $('rPrev').hidden = false; $('rNext').hidden = false;
   if (mag.src && isArchive(mag.src)) {
     // las revistas de archive.org se leen con su propio lector, sin bajarlas
     fr.src = 'https://archive.org/embed/' + encodeURIComponent(AO_RE.exec(mag.src)[1]);
-    fr.hidden = false; $('rL').hidden = true; $('rR').hidden = true; $('rPrev').hidden = true; $('rNext').hidden = true;
+    fr.hidden = false; $('rL').hidden = true; $('rR').hidden = true; $('rPrev').hidden = true; $('rNext').hidden = true; $('rPosterL').hidden = true; $('rPosterR').hidden = true;
     $('rPage').textContent = 'From archive.org';
     return;
   }
@@ -2208,6 +2298,9 @@ async function readerShow() {
   const tok = READER.token, i = READER.i, L = $('rL'), R = $('rR');
   const pair = readerWide() && i > 0;
   L.hidden = !pair;
+  // cada página que se ve se puede convertir en póster
+  READER.pages = pair ? [i, i + 1 < READER.n ? i + 1 : -1] : [-1, i];
+  [['rPosterL', READER.pages[0]], ['rPosterR', READER.pages[1]]].forEach(([b, k]) => { $(b).hidden = k < 0; $(b).textContent = 'Poster of page ' + (k + 1); });
   $('rPage').textContent = pair && i + 1 < READER.n ? 'Páginas ' + (i + 1) + '–' + (i + 2) + ' de ' + READER.n : 'Página ' + (i + 1) + ' de ' + READER.n;
   paperSound();
   try {
@@ -2215,6 +2308,68 @@ async function readerShow() {
     if (pair && i + 1 >= READER.n) { R.width = L.width; R.height = L.height; const x = R.getContext('2d'); x.fillStyle = '#e9e1cf'; x.fillRect(0, 0, R.width, R.height); }
     else await READER.render(pair ? i + 1 : i, R);
   } catch (e) { $('rPage').textContent = 'This page couldn\'t be read.'; }
+}
+/* pósters hechos con una página de una revista o libro: la imagen queda en IndexedDB (pimg:<id>) */
+function registerMine(m) {
+  addEntry({ name: m.name, id: m.id, year: 0, kind: 'mio', make: () => {
+    const a = m.w / m.h, h = a >= 1 ? 0.5 / a : 0.6, w = a >= 1 ? 0.5 : 0.6 * a;
+    const g = makePosterMesh(drawPosterTitle(m.name, 'imprimiendo…'), w, h, false);
+    idb.get('pimg:' + m.id).then((b) => (b ? loadImageTex([URL.createObjectURL(b)]) : Promise.reject(new Error('no image')))).then((t) => {
+      const mat = g.children[0].material; if (mat.map) mat.map.dispose(); mat.map = t; mat.needsUpdate = true;
+    }).catch(() => {});
+    return addItem(m.id, 'poster', g, new THREE.Vector3(), { radius: 0.01, label: 'the poster ' + m.name, data: { half: 0.002 } });
+  } });
+}
+async function makePagePoster(k) {
+  const render = READER.render, name = (READER.name || 'Revista') + ', p. ' + (k + 1);
+  if (!render || k < 0) return;
+  closeComfort();
+  toast('Printing the poster of ' + name + '…', 6000);
+  try {
+    const c = document.createElement('canvas');
+    await render(k, c);
+    // a lo sumo 1400 px de alto: alcanza para la pared y no pesa
+    const sc = Math.min(1, 1400 / c.height), o = document.createElement('canvas');
+    o.width = Math.round(c.width * sc); o.height = Math.round(c.height * sc);
+    o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+    const blob = await new Promise((res) => o.toBlob(res, 'image/jpeg', 0.85));
+    if (!blob) throw new Error('no image');
+    if (!SALV.mine) SALV.mine = [];
+    const m = { id: 'pp:' + Date.now().toString(36), name, w: o.width, h: o.height };
+    await idb.set('pimg:' + m.id, blob);
+    SALV.mine.push(m); SALV.got.push(m.id); SALV.spawned.push(m.id);
+    registerMine(m);
+    const it = CATALOG.get(m.id).make();
+    saveSalv();
+    if (!it) return;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    it.g.position.copy(camera.position).addScaledVector(dir, 0.6);
+    // de frente a vos, con el borde de arriba hacia arriba
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    it.g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(up, dir).negate().normalize(), dir.clone().negate(), up.clone().negate()));
+    if (state === 'walk' && !held.it) grabItem(it, 0.6);
+    saveItems();
+    toast('Done: aim at a wall and click to stick it with velcro.', 6000);
+  } catch (e) { console.warn('póster', e); toast('Couldn\'t print that page.', 6000); }
+}
+// la tapa de los libros y revistas en PDF es su primera página; se dibuja una vez y queda guardada (cover:<id>)
+let coverQ = Promise.resolve();
+function pdfCover(id, src, mat) {
+  const apply = (b) => loadImageTex([URL.createObjectURL(b)]).then((t) => { if (mat.map) mat.map.dispose(); mat.map = t; mat.needsUpdate = true; });
+  coverQ = coverQ.then(async () => {
+    const saved = await idb.get('cover:' + id);
+    if (saved) return apply(saved);
+    if (!window.pdfjsLib) await loadScript('lib/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+    // con pedidos por rango solo baja lo necesario para la primera página
+    const doc = await pdfjsLib.getDocument({ url: src, disableAutoFetch: true, disableStream: true, rangeChunkSize: 131072 }).promise;
+    const pg = await doc.getPage(1), v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 480 / v0.height });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    doc.destroy();
+    const b = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.8));
+    if (b) { await idb.set('cover:' + id, b); await apply(b); }
+  }).catch((e) => console.warn('tapa', e));
 }
 function readerTurn(d) {
   if (!READER.n) return;
@@ -2242,12 +2397,13 @@ function expel() {
 }
 
 /* ---------- vidrios, luces y confort ---------- */
-const comfort = Object.assign({ tint: 0.15, light: 0.7, warm: 0.8 }, store.get('orbita.comfort', {}));
+const comfort = Object.assign({ tint: 0.15, floor: 0.35, light: 0.7, warm: 0.8 }, store.get('orbita.comfort', {}));
 const glassMat = new THREE.MeshBasicMaterial({ color: 0x020305, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
-WINDOWS.forEach((key) => {
+const floorGlassMat = glassMat.clone();
+[...WINDOWS, ...FLOOR_WINDOWS].forEach((key) => {
   const [i, sgi] = key.split(':').map(Number);
   const { th, nx, ny } = faceFrame(i);
-  const gl = new THREE.Mesh(new THREE.PlaneGeometry(POD.S - 0.1, 0.92), glassMat);
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(POD.S - 0.1, 0.92), FLOOR_WINDOWS.has(key) ? floorGlassMat : glassMat);
   gl.position.set(nx * (POD.A + 0.06), POD.C + ny * (POD.A + 0.06), POD.z0 + sgi + 0.5);
   gl.rotation.set(Math.PI / 2, 0, th, 'ZXY');
   gl.rotation.order = 'ZXY';
@@ -2270,6 +2426,7 @@ function applyLights() {
   lamp.visible = lights.lamp;
   bulb.material.color.set(lights.lamp ? 0xffd9a0 : 0x3a3128);
   glassMat.opacity = comfort.tint * 0.985;
+  floorGlassMat.opacity = comfort.floor * 0.985;
   drawComfortPanel();
 }
 function setComfort(k, v) { comfort[k] = v; store.set('orbita.comfort', comfort); applyLights(); }
@@ -2283,8 +2440,8 @@ function drawComfortPanel() {
   const x = comfCanvas.getContext('2d'), W = 320, H = 240;
   x.fillStyle = '#14100c'; x.fillRect(0, 0, W, H);
   x.fillStyle = '#ffb341'; x.font = '26px VT323, monospace'; x.fillText('CONFORT', 16, 32);
-  [['VIDRIOS', comfort.tint], ['LUCES', comfort.light], ['CALIDEZ', comfort.warm]].forEach(([n, v], k) => {
-    const y = 70 + k * 52;
+  [['WINDOWS', comfort.tint], ['FLOOR', comfort.floor], ['LIGHTS', comfort.light], ['WARMTH', comfort.warm]].forEach(([n, v], k) => {
+    const y = 66 + k * 40;
     x.fillStyle = '#c9a26a'; x.font = '22px VT323, monospace'; x.fillText(n, 16, y);
     x.strokeStyle = '#5a4630'; x.strokeRect(120, y - 16, 180, 18);
     x.fillStyle = '#ffb341'; x.fillRect(122, y - 14, 176 * v, 14);
@@ -2388,6 +2545,7 @@ function vhsPlay() {
     v.src = tape.resolved || tape.url; v.playsInline = true; v.loop = false; v.volume = muted ? 0 : PROJ.vol;
     v.play().catch(() => {});
     VHS.video = v; VHS.videoTex = new THREE.VideoTexture(v);
+    screenAudioAttach(v);
     projScreen.material = new THREE.MeshBasicMaterial({ map: VHS.videoTex, side: THREE.DoubleSide });
   } else {
     projScreen.material = projPlayMat; VHS.t = 0;
@@ -2433,13 +2591,59 @@ async function playEmbed(tape) {
   try { src = await resolveArchive(tape.url, 'video'); } catch (e) {}
   if (!VHS.playing) return; // lo detuvieron mientras buscaba
   if (!src) { iframe(); return; }
-  const v = document.createElement('video');
-  v.src = src; v.playsInline = true; v.volume = muted ? 0 : PROJ.vol;
-  let started = false;
-  v.addEventListener('playing', () => { started = true; });
-  v.addEventListener('error', () => { if (!started && EMBED.video === v) iframe(); });
-  EMBED.video = v; mount(v);
-  v.play().catch(() => {});
+  // con CORS el sonido puede salir de la pantalla; si el servidor no lo permite, se prueba sin CORS y después con el reproductor de archive.org
+  const make = (cors) => {
+    const v = document.createElement('video');
+    if (cors) v.crossOrigin = 'anonymous';
+    v.src = src; v.playsInline = true; v.volume = muted ? 0 : PROJ.vol;
+    let started = false;
+    v.addEventListener('playing', () => { started = true; });
+    v.addEventListener('error', () => { if (!started && EMBED.video === v) { if (cors) make(false); else iframe(); } });
+    EMBED.video = v; mount(v);
+    if (cors) screenAudioAttach(v);
+    v.play().catch(() => {});
+  };
+  make(true);
+}
+/* el sonido de la pantalla sale de la pantalla: un panner de Web Audio sigue su posición y la tuya */
+const SCREEN_AUDIO = { on: store.get('orbita.screen3d', true), el: null, src: null, pan: null };
+const _lp = new THREE.Vector3(), _lf = new THREE.Vector3(), _lu = new THREE.Vector3(), _sp = new THREE.Vector3();
+function screenAudioAttach(v) {
+  if (!audio || !v || SCREEN_AUDIO.el === v) return;
+  screenAudioDetach();
+  try {
+    const { ctx } = audio, src = ctx.createMediaElementSource(v), pan = ctx.createPanner();
+    pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.refDistance = 1.2; pan.rolloffFactor = 1.6; pan.maxDistance = 40;
+    Object.assign(SCREEN_AUDIO, { el: v, src, pan });
+    screenAudioRoute();
+  } catch (e) { console.warn('screen sound', e); }
+}
+function screenAudioRoute() {
+  const S = SCREEN_AUDIO;
+  if (!S.src) return;
+  try { S.src.disconnect(); S.pan.disconnect(); } catch (e) {}
+  if (S.on) { S.src.connect(S.pan); S.pan.connect(audio.master); } else S.src.connect(audio.master);
+}
+function screenAudioDetach() {
+  const S = SCREEN_AUDIO;
+  if (S.src) { try { S.src.disconnect(); S.pan.disconnect(); } catch (e) {} }
+  S.el = S.src = S.pan = null;
+}
+function setScreen3d(on) { SCREEN_AUDIO.on = on; store.set('orbita.screen3d', on); screenAudioRoute(); }
+const setAP = (p, v) => { if (p) p.value = v; };
+function updateScreenAudio() {
+  const S = SCREEN_AUDIO;
+  if (!S.pan || !S.on) return;
+  if (S.el !== screenMedia()) { screenAudioDetach(); return; }
+  const L = audio.ctx.listener;
+  camera.getWorldPosition(_lp); camera.getWorldDirection(_lf); _lu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  if (L.positionX) { setAP(L.positionX, _lp.x); setAP(L.positionY, _lp.y); setAP(L.positionZ, _lp.z); setAP(L.forwardX, _lf.x); setAP(L.forwardY, _lf.y); setAP(L.forwardZ, _lf.z); setAP(L.upX, _lu.x); setAP(L.upY, _lu.y); setAP(L.upZ, _lu.z); }
+  else { L.setPosition(_lp.x, _lp.y, _lp.z); L.setOrientation(_lf.x, _lf.y, _lf.z, _lu.x, _lu.y, _lu.z); }
+  // el centro de la tela, no el borde de donde cuelga
+  if (!projGeo.boundingBox) projGeo.computeBoundingBox();
+  projGeo.boundingBox.getCenter(_sp); projScreen.localToWorld(_sp);
+  if (S.pan.positionX) { setAP(S.pan.positionX, _sp.x); setAP(S.pan.positionY, _sp.y); setAP(S.pan.positionZ, _sp.z); }
+  else S.pan.setPosition(_sp.x, _sp.y, _sp.z);
 }
 function stopEmbed() {
   if (EMBED.video) { EMBED.video.pause(); EMBED.video.removeAttribute('src'); EMBED.video.load(); EMBED.video = null; }
@@ -2560,6 +2764,7 @@ const orbitLine = $('orbitLine');
 
 /* ---------- sonido ---------- */
 let audio = null, muted = store.get('orbita.muted', false);
+let showHints = store.get('orbita.hints', true); // el cartel que dice qué hace lo que apuntás
 function startAudio() {
   if (audio) return;
   try {
@@ -2776,8 +2981,8 @@ function write(s) {
 function cls() { term.lines = ['']; term.dirty = true; }
 function curCol() { return term.lines[term.lines.length - 1].length; }
 let blink = true;
-function renderTerm() {
-  const x = tctx;
+function renderTerm(st = cur) {
+  const x = st.tctx;
   x.fillStyle = '#0c0803'; x.fillRect(0, 0, TW, TH);
   const showInput = !B.running || B.waiting;
   const last = term.lines[term.lines.length - 1] + (showInput ? term.input : '');
@@ -2789,7 +2994,7 @@ function renderTerm() {
   x.font = '28px VT323, monospace';
   x.textBaseline = 'top';
   // la ROM usa el tono de la perilla (en "color" queda ámbar)
-  const ph = (typeof S1 !== 'undefined' && TONES[S1.tone]) || '#ffb341';
+  const ph = TONES[st.tone] || '#ffb341';
   x.fillStyle = ph;
   x.shadowColor = ph; x.shadowBlur = 10;
   view.forEach((ln, i) => x.fillText(ln, term.pad, term.pad + i * term.lh));
@@ -2803,7 +3008,7 @@ function renderTerm() {
   const g = x.createRadialGradient(TW / 2, TH / 2, TH * 0.35, TW / 2, TH / 2, TH * 0.85);
   g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.65)');
   x.fillStyle = g; x.fillRect(0, 0, TW, TH);
-  termTex.needsUpdate = true;
+  st.termTex.needsUpdate = true;
   term.dirty = false;
 }
 
@@ -2858,16 +3063,17 @@ Object.entries(GAME_DISKS).forEach(([k, [label, color]]) => { DISKS[k] = { label
 const userDisks = store.get('orbita.udisks', {});
 Object.entries(userDisks).forEach(([k, d]) => { DISKS[k] = Object.assign({ game: true }, d); });
 const drive = { cur: 'C', inA: store.get('orbita.inA', null) };
+const rdrive = () => (typeof cur !== 'undefined' ? cur.drive : drive); // la ROM lee la disquetera de la estación en uso
 function driveFiles(letter) {
   if (letter === 'C') return Object.assign({}, C_BUILTIN, userFiles);
-  if (!drive.inA || !DISKS[drive.inA]) return null;
-  return DISKS[drive.inA].files || {};
+  if (!rdrive().inA || !DISKS[rdrive().inA]) return null;
+  return DISKS[rdrive().inA].files || {};
 }
-function allFiles() { return driveFiles(drive.cur) || {}; }
+function allFiles() { return driveFiles(rdrive().cur) || {}; }
 function findFile(name, defExt) {
   name = (name || '').toUpperCase().replace(/^"|"$/g, '');
   const m = name.match(/^([AC]):(.*)$/);
-  const letters = m ? [m[1]] : [drive.cur, drive.cur === 'C' ? 'A' : 'C'];
+  const letters = m ? [m[1]] : [rdrive().cur, rdrive().cur === 'C' ? 'A' : 'C'];
   if (m) name = m[2];
   for (const L of letters) {
     const files = driveFiles(L);
@@ -2878,8 +3084,8 @@ function findFile(name, defExt) {
   return null;
 }
 function saveFile(name, text) {
-  if (drive.cur === 'A') {
-    const d = DISKS[drive.inA];
+  if (rdrive().cur === 'A') {
+    const d = DISKS[rdrive().inA];
     if (!d) return 'No floppy in drive A:';
     if (!d.writable) return 'Floppy is write-protected';
     d.files[name] = text; store.set('orbita.misprog', d.files);
@@ -2891,19 +3097,19 @@ function saveFile(name, text) {
 }
 function deleteFile(name) {
   const f = findFile(name, ['.BAS', '.TXT']);
-  if (!f || f.L !== drive.cur) return 'File not found';
+  if (!f || f.L !== rdrive().cur) return 'File not found';
   if (f.L === 'C') {
     if (C_BUILTIN[f.name] != null) return 'That file came with the station and can\'t be deleted';
     delete userFiles[f.name]; store.set('orbita.files', userFiles); return f.name + ' borrado';
   }
-  const d = DISKS[drive.inA];
+  const d = DISKS[rdrive().inA];
   if (!d.writable) return 'Floppy is write-protected';
   delete d.files[f.name]; store.set('orbita.misprog', d.files); return f.name + ' borrado';
 }
 
 /* ---------- DOS ---------- */
 let mode = 'dos';
-const prompt = () => drive.cur + ':\\>';
+const prompt = () => rdrive().cur + ':\\>';
 function boot() {
   cls();
   write('ORBITA-DOS 3.30   Rebuilt Earth terminal\n640K OK\n\nType HELP to see the commands.\n\n' + prompt());
@@ -2917,19 +3123,19 @@ function dos(line) {
     case 'A:': case 'C:': {
       const L = cmd[0];
       if (L === 'A' && !driveFiles('A')) { write('No floppy in drive A:\n'); break; }
-      drive.cur = L; break;
+      rdrive().cur = L; break;
     }
-    case 'PC': pcSetMode('pc'); return;
+    case 'PC': pcSetMode('pc', null, cur); return;
     case 'AYUDA': case 'HELP':
       write('PC       returns to the computer\'s DOS\nDIR      lists the files\nTYPE     shows a file\nA: C:    switches drive\nBASIC    opens BASIC (BASIC NAME loads and runs)\nCLS      clears the screen\nTIME     orbit status\nVER      system version\nDEL      deletes one of your files\nECHO     repeats some text\n');
       break;
     case 'DIR': {
-      const files = driveFiles(drive.cur);
+      const files = driveFiles(rdrive().cur);
       if (!files) { write('No floppy in drive A:\n'); break; }
-      if (drive.cur === 'A' && DISKS[drive.inA].game) { write('This floppy is PC-formatted and the ROM can\'t read it.\nType PC to use the computer\'s DOS.\n'); break; }
+      if (rdrive().cur === 'A' && DISKS[rdrive().inA].game) { write('This floppy is PC-formatted and the ROM can\'t read it.\nType PC to use the computer\'s DOS.\n'); break; }
       const names = Object.keys(files).sort();
-      const vol = drive.cur === 'C' ? 'ORBITA' : DISKS[drive.inA].label;
-      write(' Volume in drive ' + drive.cur + ' es ' + vol + '\n Directory of ' + drive.cur + ':\\\n\n');
+      const vol = rdrive().cur === 'C' ? 'ORBITA' : DISKS[rdrive().inA].label;
+      write(' Volume in drive ' + rdrive().cur + ' es ' + vol + '\n Directory of ' + rdrive().cur + ':\\\n\n');
       names.forEach((n) => {
         const [b, e] = n.split('.');
         write((b.padEnd(9) + (e || '').padEnd(4) + String(files[n].length).padStart(8)) + '\n');
@@ -2990,9 +3196,9 @@ function ejectDisk(st = cur) {
   if (st.pc.ci && DISKS[id] && DISKS[id].game) pcSave(st.pc, id);
   st.drive.inA = null;
   pcSyncA(st.pc);
-  if (st.rom && drive.cur === 'A') {
-    drive.cur = 'C';
-    if (mode === 'dos' && !B.running) write('\nFloppy removed. Back to C:\n\n' + prompt());
+  if (st.rom && st.drive.cur === 'A') {
+    st.drive.cur = 'C';
+    if (st === cur && st.pc.mode !== 'pc' && mode === 'dos' && !B.running) write('\nFloppy removed. Back to C:\n\n' + prompt());
   }
   drawDrive(st);
   click();
@@ -3401,9 +3607,14 @@ const idb = (() => {
     const t = d.transaction('kv', mode), r = fn(t.objectStore('kv'));
     t.oncomplete = () => res(r.result); t.onerror = () => rej(t.error);
   }));
+  let frozen = false; // al cargar una partida de un archivo nada más escribe hasta recargar
   return {
     get: (k) => run('readonly', (s) => s.get(k)).catch(() => null),
-    set: (k, v) => run('readwrite', (s) => s.put(v, k)).catch(() => null)
+    set: (k, v) => frozen ? Promise.resolve() : run('readwrite', (s) => s.put(v, k)).catch(() => null),
+    keys: () => run('readonly', (s) => s.getAllKeys()).catch(() => []),
+    del: (k) => run('readwrite', (s) => s.delete(k)).catch(() => null),
+    put: (k, v) => run('readwrite', (s) => s.put(v, k)),
+    freeze: () => { frozen = true; }
   };
 })();
 
@@ -3474,7 +3685,7 @@ function makePC(st) {
   const c = document.createElement('canvas'); c.width = 640; c.height = 400;
   const ctx = c.getContext('2d');
   return {
-    st, ci: null, status: 'off', mode: st.rom ? store.get('orbita.pcmode', 'pc') : 'pc', msg: '',
+    st, ci: null, status: 'off', mode: store.get(st.id === 1 ? 'orbita.pcmode' : 'orbita.pcmode' + st.id, 'pc'), msg: '',
     canvas: c, ctx, img: ctx.createImageData(640, 400),
     fw: 640, fh: 400, dirty: true, aFiles: [], queue: Promise.resolve(),
     down: new Set(), escAt: 0, pollT: 0, saveT: 0, sp: null, gain: null, ring: new Float32Array(65536), rp: 0, wp: 0, freq: 48000
@@ -3548,9 +3759,6 @@ const drivePanel2 = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.1), new THREE
 drivePanel2.position.set(-1.243, 1.05, -2.0); drivePanel2.rotation.y = Math.PI / 2; scene.add(drivePanel2);
 const keyboard2 = keyboard.clone(); keyboard2.position.set(-0.8, DESK_TOP, -2.0); keyboard2.rotation.y = Math.PI / 2; scene.add(keyboard2);
 const kbBody2 = keyboard2.children[0];
-box(0.45, 0.07, 0.45, matCushion, -0.2, 0.48, -2.0);
-box(0.06, 0.5, 0.45, matCushion, 0.02, 0.78, -2.0);
-box(0.05, 0.44, 0.05, matDark, -0.2, 0.22, -2.0);
 // perillas de tono, abajo a la derecha de cada monitor
 function makeKnob(x, z, ry) {
   const k = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.02, 16), new THREE.MeshStandardMaterial({ color: 0xc8662a, roughness: 0.5, metalness: 0.3 }));
@@ -3560,7 +3768,7 @@ function makeKnob(x, z, ry) {
 const knob1 = makeKnob(1.21, -1.9 + 0.24, 0);
 const knob2 = makeKnob(-1.21, -2.0 - 0.24, 0);
 const S2 = {
-  id: 2, rom: false, drive: { cur: 'C', inA: null }, drivePanel: drivePanel2, driveCanvas: driveCanvas2, driveTex: driveTex2,
+  id: 2, rom: true, drive: { cur: 'C', inA: null }, drivePanel: drivePanel2, driveCanvas: driveCanvas2, driveTex: driveTex2,
   drivePos: new THREE.Vector3(-1.22, 1.03, -2.0), driveQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, Math.PI / 2, 'YXZ')),
   ejectOff: new THREE.Vector3(0.06, 0, 0), ejectVel: new THREE.Vector3(0.32, 0.03, 0),
   screenC: SCREEN2_C, tctx: tctx2, termTex: termTex2, termCanvas: termCanvas2, cKey: 'cdrive2', tone: store.get('orbita.tone2', 'verde'),
@@ -3570,6 +3778,27 @@ S1.termCanvas = termCanvas;
 S2.pc = makePC(S2);
 const STATIONS = [S1, S2];
 S1.knob = knob1; S2.knob = knob2;
+// llave ROM / DOS: una palanquita junto a la perilla de tono
+function makeSwitch(knob, side) {
+  // side 1: la estación mira hacia -x (pared derecha); -1: hacia +x
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: 0x23272c, roughness: 0.6, metalness: 0.5 })));
+  const lab = canvasTex(64, 96, (x, w, h) => { x.fillStyle = '#23272c'; x.fillRect(0, 0, w, h); x.fillStyle = '#c9a26a'; x.font = 'bold 22px monospace'; x.textAlign = 'center'; x.fillText('ROM', w / 2, 24); x.fillText('DOS', w / 2, h - 8); });
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.06), new THREE.MeshBasicMaterial({ map: lab }));
+  face.rotation.y = -side * Math.PI / 2; face.position.x = -side * 0.0062; g.add(face);
+  const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.005, 0.03, 8), new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.3, metalness: 0.7 }));
+  lever.geometry.translate(0, 0.015, 0); lever.rotation.z = side * Math.PI / 2;
+  const pivot = new THREE.Group(); pivot.position.x = -side * 0.007; pivot.add(lever); g.add(pivot);
+  g.position.copy(knob.position); g.position.z += side > 0 ? 0.075 : -0.075;
+  scene.add(g);
+  return { g, pivot };
+}
+const leverAngle = (st) => (st.pc.mode === 'rom' ? -1 : 1) * st.switchSide * 0.55;
+[[S1, 1], [S2, -1]].forEach(([st, side]) => {
+  const sw = makeSwitch(st.knob, side);
+  st.switchMesh = sw.g; st.switchLever = sw.pivot; st.switchSide = side;
+  sw.pivot.rotation.z = leverAngle(st);
+});
 S1.screen = screen; S2.screen = screen2;
 let cur = S1;
 function cycleTone(st) {
@@ -3618,10 +3847,12 @@ const PC_CONF = [
   'mount c ./c -nocachedir',
   'mount a ./a -nocachedir',
   'c:',
+  'path c:\\nc;z:\\',
   'cls',
   'echo ORBITA PC - DOS 5.0',
   'echo C: hard disk   A: floppy drive',
-  'echo TYPE LEEME.TXT to get started.',
+  'echo TYPE LEEME.TXT to begin. NC opens Norton Commander.',
+  'if exist JUEGOS.TXT echo Installed games: TYPE JUEGOS.TXT',
   'echo.'
 ].join('\n') + '\n';
 
@@ -3656,13 +3887,17 @@ function pcBoot(P) {
     P.status = 'fail';
     pcMsg(P, 'Couldn\'t boot DOS.');
     console.warn('PC', e);
-    if (P.st.rom) pcSetMode('rom', 'The PC couldn\'t boot in this browser. You\'re still in the station ROM.');
+    if (P.st.rom) pcSetMode('rom', 'The PC couldn\'t boot in this browser. You\'re still in the station ROM.', P.st);
   };
-  const guard = setTimeout(() => { if (P.status === 'loading') fail(new Error('tiempo')); }, 60000);
+  let guard = null; // el tiempo límite corre desde que arranca el emulador (instalar el C: la primera vez puede tardar)
   (window.emulators ? Promise.resolve() : loadScript('emu/emulators.js')).then(async () => {
     emulators.pathPrefix = 'emu/';
     const saved = (await idb.get(P.st.cKey)) || {};
+    pcMsg(P, 'Installing C:...');
+    const pack = await cPack();
+    P.packSizes = new Map(pack.map((f) => [f.path, f.contents.length]));
     const init = [{ dosboxConf: P.st.rom ? PC_CONF : PC_CONF.replace('ORBITA PC - DOS 5.0', 'STATION 2 - DOS 5.0'), jsdosConf: { version: '8' } }];
+    pack.forEach((f) => { if (!(f.path in saved)) init.push({ path: 'c/' + f.path, contents: f.contents }); });
     Object.entries(saved).forEach(([p, c]) => init.push({ path: 'c/' + p, contents: c }));
     init.push({ path: 'c/LEEME.TXT', contents: enc(P.st.rom ? PC_LEEME : PC_LEEME2) });
     if (P.st.rom) init.push({ path: 'c/ORBITA.COM', contents: ORBITA_COM });
@@ -3671,6 +3906,7 @@ function pcBoot(P) {
     if (!af.length) init.push({ path: 'a/.vacio', contents: new Uint8Array(0) });
     P.aFiles = af.map((f) => f.path);
     pcMsg(P, 'Arrancando...');
+    guard = setTimeout(() => { if (P.status === 'loading') fail(new Error('tiempo')); }, 180000);
     const ci = await emulators.dosboxXWorker(init);
     clearTimeout(guard);
     if (P.status !== 'loading') { ci.exit(); return; }
@@ -3694,6 +3930,35 @@ function pcBoot(P) {
     if (!af.length) P.queue = P.queue.then(() => ci.fsDeleteFile('a/.vacio')).catch(() => {});
     pcAudioStart(P);
   }).catch(fail);
+}
+// el C: viene con programas y juegos instalados (carpeta c/ junto al juego, ver c/pack.json)
+let cPackP = null;
+function cPack() {
+  if (!cPackP) cPackP = (async () => {
+    let list = [];
+    try { const r = await fetch('c/pack.json', { cache: 'no-cache' }); if (r.ok && /json/i.test(r.headers.get('content-type') || 'json')) list = (await r.json()).paquetes || []; } catch (e) {}
+    const out = [], bats = [];
+    for (const pk of list) {
+      const dir = String(pk.carpeta || pk.zip.replace(/\.zip$/i, '')).toUpperCase().replace(/\\/g, '/');
+      try {
+        let files = await idb.get('cpack:' + pk.zip);
+        if (!files) {
+          pcMsg(PC, 'Installing ' + (pk.nombre || pk.zip) + '...'); if (S2.pc.status === 'loading') pcMsg(S2.pc, 'Installing ' + (pk.nombre || pk.zip) + '...');
+          const r = await fetch('c/' + pk.zip);
+          if (!r.ok) throw new Error(r.status);
+          files = (await filesFromUpload(new File([await r.blob()], pk.zip))).files;
+          await idb.set('cpack:' + pk.zip, files);
+        }
+        files.forEach((f) => out.push({ path: dir + '/' + f.path, contents: f.contents }));
+        if (pk.ejecutar) bats.push([pk.ejecutar.toUpperCase().slice(0, 8), dir, pk.ejecutar, pk.nombre || dir]);
+      } catch (e) { console.warn('C:', pk.zip, e); }
+    }
+    // un .BAT por juego en C:\ para arrancarlo desde cualquier lado, y JUEGOS.TXT con la lista
+    bats.forEach(([b, dir, run]) => out.push({ path: b + '.BAT', contents: enc(crlf(['@echo off', 'c:', 'cd \\' + dir.replace(/\//g, '\\'), run, 'cd \\', ''].join('\n'))) }));
+    if (bats.length) out.push({ path: 'JUEGOS.TXT', contents: enc(crlf(['GAMES INSTALLED ON C:', '', ...bats.map(([b, , , n]) => (b + '        ').slice(0, 10) + n), '', 'Type the name (for example ' + bats[0][0] + ') to play.', 'NC opens Norton Commander.', ''].join('\n'))) });
+    return out;
+  })();
+  return cPackP;
 }
 // los cambios de disquete se encolan para no pisarse
 function pcSyncA(P) {
@@ -3731,6 +3996,8 @@ function pcSave(P, aid = P.st.drive.inA) {
     if (!ci) return;
     const c = await pcReadDir(ci, 'c');
     delete c['LEEME.TXT']; delete c['ORBITA.COM'];
+    // lo que vino instalado y no cambió no se guarda: se vuelve a poner al arrancar
+    if (P.packSizes) for (const [p, n] of P.packSizes) if (c[p] && c[p].length === n) delete c[p];
     await idb.set(P.st.cKey, c);
     const d = DISKS[aid];
     if (d && d.game && d.loaded && (P.aFiles.length || d.blank)) {
@@ -3743,20 +4010,40 @@ function pcSave(P, aid = P.st.drive.inA) {
   }).catch((e) => console.warn('guardar', e));
   return P.queue;
 }
-function pcSetMode(m, note) {
+function pcSetMode(m, note, st = cur) {
+  const PC = st.pc;
   if (PC.mode === m) return;
-  PC.mode = m; store.set('orbita.pcmode', m);
+  PC.mode = m; store.set(st.id === 1 ? 'orbita.pcmode' : 'orbita.pcmode' + st.id, m);
+  if (st.switchLever) st.switchLever.rotation.z = leverAngle(st);
   if (m === 'rom') {
-    mode = 'dos';
+    const was = cur;
+    useRomOf(st);
+    mode = 'dos'; B.running = false;
     cls();
-    write('ORBITA-DOS 3.30   Station ROM\n' + (note ? note + '\n' : '') + 'Type PC to go back to the computer\'s DOS.\n\n' + prompt());
-    term.dirty = true;
+    write('ORBITA-DOS 3.30   ROM of station ' + st.id + '\n' + (note ? note + '\n' : '') + 'Type PC or flip the switch to go back to DOS.\n\n' + prompt());
+    term.dirty = true; renderTerm(st);
+    useRomOf(was);
   } else {
     PC.dirty = true;
     if (PC.ci) { PC.ci.sendKeyEvent(257, true); setTimeout(() => PC.ci && PC.ci.sendKeyEvent(257, false), 60); }
     else if (PC.status === 'off' || PC.status === 'fail') { PC.status = 'off'; pcBoot(PC); }
   }
   updateTermHelp();
+}
+// cada estación guarda su propia sesión de la ROM (pantalla, programa BASIC); al cambiar de estación se intercambian
+const ROM_KEYS_T = ['lines', 'input', 'history', 'hIdx'], ROM_KEYS_B = Object.keys(B);
+function useRomOf(st) {
+  if (st === cur) return;
+  const save = (o) => { o.rs = { t: {}, b: {}, mode }; ROM_KEYS_T.forEach((k) => { o.rs.t[k] = term[k]; }); ROM_KEYS_B.forEach((k) => { o.rs.b[k] = B[k]; }); };
+  save(cur);
+  if (st.rs) { ROM_KEYS_T.forEach((k) => { term[k] = st.rs.t[k]; }); ROM_KEYS_B.forEach((k) => { B[k] = st.rs.b[k]; }); mode = st.rs.mode; }
+  else { term.lines = ['']; term.input = ''; term.history = []; term.hIdx = 0; Object.assign(B, { prog: new Map(), vars: {}, running: false, lines: [], li: 0, pos: 0, forStack: [], gosub: [], waiting: null, sleepUntil: 0, jumped: false }); mode = 'dos'; write(prompt()); }
+  cur = st; term.dirty = true;
+}
+function flipSwitch(st) {
+  click(); noiseBurst(0.05, 'highpass', 2000, 0.2, 3);
+  pcSetMode(st.pc.mode === 'pc' ? 'rom' : 'pc', null, st);
+  toast('Estación ' + st.id + ': ' + (st.pc.mode === 'pc' ? 'the computer\'s DOS.' : 'the station ROM (BASIC).'), 3000);
 }
 
 /* sonido de la PC: un búfer circular que se reproduce con remuestreo simple */
@@ -3839,7 +4126,7 @@ function updatePC(P, dt) {
     P.pollT += dt;
     if (P.pollT > 0.7) {
       P.pollT = 0;
-      P.ci.getRunningProgram().then((n) => { if (P.st.rom && /^ORBITA/i.test(n || '') && P.mode === 'pc') pcSetMode('rom'); }).catch(() => {});
+      P.ci.getRunningProgram().then((n) => { if (P.st.rom && /^ORBITA/i.test(n || '') && P.mode === 'pc') pcSetMode('rom', null, P.st); }).catch(() => {});
     }
   }
   if (P.ci && state === 'terminal' && cur === P.st) { P.saveT += dt; if (P.saveT > 45) { P.saveT = 0; pcSave(P); } }
@@ -3951,6 +4238,7 @@ const targets = [
   { objs: [screen, housing, kbBody], label: () => 'use the computer', act: () => enterTerminal(S1) },
   ...STATIONS.map((st) => ({ objs: [st.drivePanel], label: () => driveLabel(st), act: () => driveAction(st) })),
   { objs: [screen2, housing2, kbBody2], label: () => 'use station 2', act: () => enterTerminal(S2) },
+  ...STATIONS.map((st) => ({ objs: [st.switchMesh], label: () => 'switch of station ' + st.id + ': ' + (st.pc.mode === 'pc' ? 'switch to the ROM' : 'switch to DOS'), act: () => flipSwitch(st) })),
   ...STATIONS.map((st) => ({ objs: [st.knob], label: () => 'change the monitor color (' + TONE_NAME[st.tone] + ')', act: () => cycleTone(st) })),
   { objs: blankBoxMeshes, label: () => 'take a blank floppy', act: () => newBlankDisk() },
   { objs: [switchPlate, switchNub], label: () => (lights.ceiling ? 'turn off the lights' : 'turn on the lights'), act: () => toggleCeiling() },
@@ -4016,7 +4304,7 @@ function setUI() {
 
 function enterTerminal(st = S1) {
   if (state !== 'walk') return;
-  cur = st;
+  useRomOf(st);
   updateTermHelp();
   if (held.it) releaseItem();
   state = 'tween';
@@ -4047,6 +4335,7 @@ function focusTyper() { try { typer.focus({ preventScroll: true }); } catch (e) 
 /* terminal de confort (panel HTML) */
 function syncComfortUI() {
   $('cTint').value = Math.round(comfort.tint * 100);
+  $('cFloor').value = Math.round(comfort.floor * 100);
   $('cLight').value = Math.round(comfort.light * 100);
   $('cWarm').value = Math.round(comfort.warm * 100);
   $('cProj').textContent = PROJ.down ? 'Raise the screen' : 'Lower the screen';
@@ -4102,7 +4391,7 @@ function closeComfort() {
   if (panelName === 'reader') { $('rFrame').src = 'about:blank'; READER.token++; }
   state = 'walk'; requestLock(); setUI();
 }
-[['cTint', 'tint'], ['cLight', 'light'], ['cWarm', 'warm']].forEach(([id, k]) => {
+[['cTint', 'tint'], ['cFloor', 'floor'], ['cLight', 'light'], ['cWarm', 'warm']].forEach(([id, k]) => {
   $(id).addEventListener('input', (e) => setComfort(k, e.target.value / 100));
 });
 $('cProj').addEventListener('click', () => { setProjector(!PROJ.down); if (!PROJ.down) vhsStop(); syncComfortUI(); });
@@ -4118,6 +4407,8 @@ $('lClose').addEventListener('click', closeComfort);
   Object.entries(PAISES).sort((a, b) => (a[0] ? 1 : 0) - (b[0] ? 1 : 0) || a[1][0].localeCompare(b[1][0])).forEach(([k, [n]]) => { const o = document.createElement('option'); o.value = k; o.textContent = n; sel.appendChild(o); });
   sel.value = AO_RANDOM.pais || '';
   sel.addEventListener('change', () => { AO_RANDOM.pais = sel.value; store.set('orbita.pais', sel.value); });
+  const sh = $('showHints'); sh.checked = showHints;
+  sh.addEventListener('change', () => { showHints = sh.checked; store.set('orbita.hints', showHints); });
   const cb = $('aoRandom'); cb.checked = AO_RANDOM.on;
   cb.addEventListener('change', () => { AO_RANDOM.on = cb.checked; store.set('orbita.aoRandom', cb.checked); });
 }
@@ -4127,6 +4418,8 @@ $('rPrev').addEventListener('click', () => readerTurn(-1));
 $('rNext').addEventListener('click', () => readerTurn(1));
 $('rR').addEventListener('click', () => readerTurn(1));
 $('rL').addEventListener('click', () => readerTurn(-1));
+$('rPosterL').addEventListener('click', () => makePagePoster(READER.pages[0]));
+$('rPosterR').addEventListener('click', () => makePagePoster(READER.pages[1]));
 $('sClose').addEventListener('click', closeComfort);
 $('mClose').addEventListener('click', closeComfort);
 $('nClose').addEventListener('click', closeComfort);
@@ -4140,6 +4433,8 @@ $('sFwd').addEventListener('click', () => { screenSeek(30); syncScreenControls()
 $('sPause').addEventListener('click', () => { screenPause(); syncComfortUI(); });
 $('sPos').addEventListener('input', (e) => { const v = screenMedia(); if (v && isFinite(v.duration)) v.currentTime = e.target.value / 1000 * v.duration; syncScreenControls(); });
 $('sVol').addEventListener('input', (e) => setScreenVol(e.target.value / 100));
+$('s3d').checked = SCREEN_AUDIO.on;
+$('s3d').addEventListener('change', (e) => setScreen3d(e.target.checked));
 [['sSize', 'size'], ['sHeight', 'height'], ['sDist', 'dist']].forEach(([id, k]) => $(id).addEventListener('input', (e) => { PROJ[k] = e.target.value / 100; layoutScreen(); saveScreen(); }));
 $('sFmt').addEventListener('click', () => { PROJ.fmt = PROJ.fmt === '16:9' ? '4:3' : '16:9'; layoutScreen(); saveScreen(); syncComfortUI(); });
 $('videoFile').addEventListener('change', (e) => {
@@ -4154,6 +4449,74 @@ $('videoFile').addEventListener('change', (e) => {
 // contacto: un correo (mailto:) o cualquier enlace; vacío, el botón no aparece
 const CONTACTO = '';
 if (CONTACTO) { const a = $('lnkContacto'); a.href = /^[^@\s]+@[^@\s]+$/.test(CONTACTO) ? 'mailto:' + CONTACTO : CONTACTO; a.hidden = false; }
+/* ---------- la partida en un archivo: lo guardado en el navegador (localStorage e IndexedDB) en un .json ---------- */
+function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+function unb64(t) { const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+async function packVal(v) {
+  if (v instanceof Uint8Array) return { $u8: b64(v) };
+  if (v instanceof ArrayBuffer) return { $ab: b64(new Uint8Array(v)) };
+  if (typeof Blob !== 'undefined' && v instanceof Blob) return { $blob: b64(new Uint8Array(await v.arrayBuffer())), type: v.type };
+  if (Array.isArray(v)) { const o = []; for (const x of v) o.push(await packVal(x)); return o; }
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) o[k] = await packVal(v[k]); return o; }
+  return v;
+}
+function unpackVal(v) {
+  if (Array.isArray(v)) return v.map(unpackVal);
+  if (v && typeof v === 'object') {
+    if (typeof v.$u8 === 'string') return unb64(v.$u8);
+    if (typeof v.$ab === 'string') return unb64(v.$ab).buffer;
+    if (typeof v.$blob === 'string') return new Blob([unb64(v.$blob)], { type: v.type || '' });
+    const o = {}; for (const k of Object.keys(v)) o[k] = unpackVal(v[k]); return o;
+  }
+  return v;
+}
+// dentro de claude.ai la descarga pasa por el visor (capacidad downloads); en GitHub Pages es un enlace común
+const dlCap = (window.claude && typeof window.claude.use === 'function') ? Promise.resolve(window.claude.use('downloads')).catch(() => null) : Promise.resolve(null);
+async function exportGame() {
+  const msg = $('progress');
+  msg.textContent = 'Preparing the file…';
+  try {
+    saveItems(); saveSalv();
+    for (const st of [S1, S2]) if (st.pc.ci) await pcSave(st.pc);
+    const ls = {};
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('orbita.')) ls[k] = localStorage.getItem(k); }
+    const db = {};
+    // los programas que vienen instalados en el C: no van: se vuelven a bajar
+    for (const k of await idb.keys()) if (!String(k).startsWith('cpack:')) db[k] = await packVal(await idb.get(k));
+    const name = 'orbita-partida-' + new Date().toISOString().slice(0, 10) + '.json';
+    const blob = new Blob([JSON.stringify({ juego: 'orbita', version: 1, fecha: new Date().toISOString(), ls, db })], { type: 'application/json' });
+    const dl = await dlCap;
+    if (dl) {
+      try { await dl.save({ filename: name, data: blob }); }
+      catch (e) { msg.textContent = e && e.code === 'declined' ? 'The file wasn\'t saved.' : 'Couldn\'t save the game to a file.'; return; }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+    msg.textContent = 'Game saved to ' + name + '.';
+  } catch (e) { console.warn('exportar', e); msg.textContent = 'Couldn\'t save the game to a file.'; }
+}
+async function importGame(file) {
+  const msg = $('progress');
+  let data = null;
+  try { data = JSON.parse(await file.text()); } catch (e) {}
+  if (!data || data.juego !== 'orbita' || !data.ls || typeof data.ls !== 'object') { msg.textContent = 'That file isn\'t an Órbita save.'; return; }
+  if (!confirm('The game in the file replaces the one in this browser. Continue?')) return;
+  msg.textContent = 'Loading the game…';
+  try {
+    store.frozen = true; idb.freeze();
+    [S1, S2].forEach((st) => { if (st.pc.ci) { try { st.pc.ci.exit(); } catch (e) {} } });
+    Object.keys(localStorage).filter((k) => k.startsWith('orbita.')).forEach((k) => localStorage.removeItem(k));
+    Object.entries(data.ls).forEach(([k, v]) => { if (k.startsWith('orbita.') && typeof v === 'string') localStorage.setItem(k, v); });
+    for (const k of await idb.keys()) if (!String(k).startsWith('cpack:')) await idb.del(k);
+    for (const [k, v] of Object.entries(data.db || {})) await idb.put(k, unpackVal(v));
+    location.reload();
+  } catch (e) { console.warn('importar', e); msg.textContent = 'Couldn\'t load the game. Reload the page.'; }
+}
+$('saveFile').addEventListener('click', exportGame);
+$('loadFile').addEventListener('click', () => $('loadInput').click());
+$('loadInput').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importGame(f); });
 $('enter').addEventListener('click', () => {
   startAudio();
   setTimeout(() => { if (PC.mode === 'pc') pcBoot(PC); else pcAudioStart(PC); }, 1500);
@@ -4183,7 +4546,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 let lastGrab = { at: 0, it: null };
-function walkClick() {
+function walkClick(e) {
   if (PROJ.moving) { dropScreen(); return; }
   // doble clic sobre una cápsula (o una caja vieja) la abre
   if (held.it && held.it === lastGrab.it && performance.now() - lastGrab.at < 450 && (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened) {
@@ -4192,8 +4555,9 @@ function walkClick() {
     return;
   }
   if (held.it) {
-    if (stickWins() && stickHeld()) return;
-    if (aimed && aimed.target) { aimed.target.act(); return; }
+    // Shift+clic lo suelta aunque estés apuntando a una pared (sin velcro)
+    if (!(e && e.shiftKey) && stickWins() && stickHeld()) return;
+    if (aimed && aimed.target && !(e && e.shiftKey)) { aimed.target.act(); return; }
     releaseItem(); return;
   }
   if (!aimed) return;
@@ -4202,10 +4566,10 @@ function walkClick() {
   grabItem(it, clamp(aimed.dist, 0.5, it.kind === 'crate' ? 1.1 : 0.8));
   lastGrab = { at: performance.now(), it };
 }
-renderer.domElement.addEventListener('click', () => {
+renderer.domElement.addEventListener('click', (e) => {
   if (state === 'walk') {
     if (!locked() && !isTouch) { requestLock(); return; }
-    walkClick();
+    walkClick(e);
   } else if (state === 'terminal' && !isTouch) focusTyper();
 });
 
@@ -4429,6 +4793,10 @@ document.addEventListener('mousedown', (e) => {
   if (held.it) held.rotating = true;
 });
 document.addEventListener('mouseup', (e) => { if (e.button === 2) held.rotating = false; });
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 1 || state !== 'walk' || !locked() || !held.it || PROJ.moving) return;
+  e.preventDefault(); throwHeld();
+});
 document.addEventListener('contextmenu', (e) => { if (state === 'walk' || state === 'terminal') e.preventDefault(); });
 renderer.domElement.addEventListener('touchstart', (e) => {
   if (state !== 'walk') return;
@@ -4615,11 +4983,11 @@ function frame() {
     if (held.it) aimStick(); else stickAim.ok = false;
     let label = null;
     if (PROJ.moving) label = 'leave the screen here';
-    else if (stickWins()) label = 'pegar ' + held.it.label + ' (velcro)';
+    else if (stickWins()) label = 'pegar ' + held.it.label + ' (velcro)' + (isTouch ? '' : ' · Shift+click: drop · middle button: throw');
     else if (aimed && aimed.target) label = aimed.target.label();
     else if (aimed && aimed.item && !held.it) label = 'agarrar ' + aimed.item.label + ((aimed.item.kind === 'crate' || aimed.item.kind === 'gamebox') && !aimed.item.opened ? ' (double-click: open)' : aimed.item.kind === 'magazine' ? ' (R to read)' : '');
-    else if (held.it) label = 'soltar ' + held.it.label + (held.it.kind === 'magazine' ? ' (R to read)' : (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened ? ' (double-click: open)' : '');
-    hint.hidden = !label;
+    else if (held.it) label = 'soltar ' + held.it.label + (held.it.kind === 'magazine' ? ' (R to read)' : (held.it.kind === 'crate' || held.it.kind === 'gamebox') && !held.it.opened ? ' (double-click: open)' : '') + (isTouch ? '' : ' · middle button: throw');
+    hint.hidden = !label || !showHints;
     if (label) hint.textContent = (isTouch ? 'Tap Use to ' : 'Click to ') + label;
     useBtn.hidden = !(isTouch && label);
     if (held.it) held.target.copy(camera.position).addScaledVector(fwd, held.dist);
@@ -4646,16 +5014,17 @@ function frame() {
   safe('objetos', () => { updateHeld(dt); updateItems(dt); });
   safe('tweens', () => updateTweens(dt));
   safe('carpeta', () => updateFolder(dt));
-  safe('pantalla', () => { updateProjector(dt); renderVhs(dt); updateEmbed(); syncScreenControls(); syncMusicUI(); });
+  safe('pantalla', () => { updateProjector(dt); renderVhs(dt); updateEmbed(); updateScreenAudio(); syncScreenControls(); syncMusicUI(); });
   safe('basic', tickBasic);
   saveT += dt; if (saveT > 3) { saveT = 0; if (items.some((it) => it.dirty)) { items.forEach((it) => { it.dirty = false; }); saveItems(); } }
   blinkT += dt;
   if (blinkT > 0.5) { blinkT = 0; blink = !blink; term.dirty = true; }
-  if (PC.mode !== 'pc' && term.dirty) renderTerm();
+  if (cur.pc.mode !== 'pc' && term.dirty) renderTerm();
   STATIONS.forEach((st) => updatePC(st.pc, dt));
   if (music.playing) { music.reel += dt * 2.5; deckT += dt; if (deckT > 0.2) { deckT = 0; drawDeck(); } }
   screenGlow.intensity = 0.3 + Math.random() * 0.02;
   renderer.render(scene, camera);
+  safe('imágenes', updateHoles);
 }
 
 /* ---------- arranque ---------- */

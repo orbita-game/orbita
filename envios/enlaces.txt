@@ -1,9 +1,4 @@
 # Una línea por cosa: año tipo dirección [nombre]
 # Tipos: juegos programas revistas videos musica decoracion
-# Los juegos de 1986 se leen directo desde archive.org. Agregá tus direcciones abajo.
-1986 juegos https://archive.org/details/msdos_Tetris_1986 Tetris
-1986 juegos https://archive.org/details/msdos_Karateka_1986 Karateka
-1986 juegos https://archive.org/details/msdos_Ghostbusters_1986 Ghostbusters
-1986 juegos https://archive.org/details/msdos_Pole_Position_1986 Pole Position
-1986 juegos https://archive.org/details/msdos_Reach_for_the_Stars_-_The_Conquest_of_the_Galaxy_1986 Reach for the Stars
-1990 videos https://archive.org/details/italia-vs-argentina-semifinal-copa-mundial-de-futbol-1990-tanda-de-penalespenalty-shootout Italia vs Argentina 1990, penales
+# Usá solo material libre: freeware, shareware que permita repartirse o dominio público.
+# La acción "Envíos" copia al repositorio los juegos, programas y revistas de esta lista.

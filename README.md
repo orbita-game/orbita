@@ -15,6 +15,8 @@ Corre entero en el navegador: no hay que instalar nada. La versión en inglés e
 5. En **Settings → Actions → General → Workflow permissions** elegí "Read and write permissions": así GitHub rearma el índice de envíos solo cada vez que subís algo.
 6. Para llenar los años solos: en la pestaña **Actions** elegí "Envíos" → **Run workflow**. GitHub busca juegos de DOS en dosgames.com y videos, revistas, música e imágenes en archive.org para los años de `envios/curar.json`, y copia los juegos, programas y revistas al repositorio. Tarda unos minutos.
 
+**En Windows:** si bajaste el zip completo, hacé doble clic en `JUGAR.bat`. Abre el juego en tu navegador con un servidor local (dejá abierta la ventana negra mientras jugás) y así funcionan el DOS, el C: con sus programas y las texturas.
+
 Para probarlo en tu computadora sin subirlo, abrí una terminal en esta carpeta y corré `python3 -m http.server`; después entrá a `http://localhost:8000`. Abrir `index.html` con doble clic no alcanza, porque el navegador bloquea el emulador y las texturas desde archivos locales.
 
 ## Agregar contenido
@@ -27,6 +29,12 @@ Todo va en `envios/`, ordenado por año. Mirá `envios/LEEME.md`. Hay tres forma
 - **Al azar:** si en la pantalla de inicio está marcada la opción "Restos al azar de archive.org", cada cápsula se completa con cosas de ese año sacadas de archive.org (y la decoración, de Wikimedia Commons), priorizando la región que elegiste. Toda cápsula trae al menos algo para decorar: si no hay conexión, llega una postal del satélite.
 
 Las cápsulas llegan de a tandas: 10 seguidas del mismo año, siempre dentro de la franja del anillo donde está el módulo (1983–1985, 1986–1988, 1989–1991, 1992–1994, 1995–1997 o 1998–1999). El botón violeta junto al sonar cambia de franja; el viaje lleva 2 horas de tiempo del módulo por franja (con T se acelera ×30). Cada una trae solo una parte de lo que hay para ese año. El sonar, junto a la escotilla del fondo, captura una por día; la red pasiva junta hasta tres cada dos días. Para probar todo rápido, agregá `?rapido` al final de la dirección: un día dura un minuto.
+
+## Aviso sobre el contenido
+
+Los restos son materiales reales de cada época (revistas, películas, música, afiches, fotos y programas) que llegan al azar desde archivos públicos como archive.org, Wikimedia Commons y dosgames.com. No se revisan uno por uno, así que pueden incluir desnudos, violencia, lenguaje fuerte u otro contenido para adultos. El juego está pensado para mayores de 18 años. Cada material pertenece a sus autores, se muestra tal como lo publica el archivo de origen y no expresa la opinión de quien hizo el juego. Si encontrás algo que no debería estar, avisá por el contacto de abajo y se saca.
+
+**Content notice:** salvage items are real period materials pulled at random from public archives (archive.org, Wikimedia Commons, dosgames.com). They are not reviewed one by one and may include nudity, violence, strong language or other adult content. Intended for ages 18+. Each item belongs to its authors and does not reflect the views of the game's creator.
 
 ## Contacto y donaciones
 
