@@ -103,6 +103,8 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
 .card .partida button { font: 12px var(--mono); color: var(--hull); background: rgba(10, 14, 22, 0.8); border: 1px solid rgba(201, 207, 214, 0.3); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
 .card .partida button.danger { border-color: rgba(255, 120, 90, 0.45); color: #f0b0a0; }
 .card .partida button:hover, .card .partida button:focus-visible { border-color: var(--hull); outline: none; }
+.card .truco { margin: 0; font-size: 11px; font-style: italic; color: var(--dim); }
+.card .truco b { font-weight: 400; color: var(--hull); letter-spacing: 0.08em; }
 #progress { font-size: 12px; color: var(--signal); font-variant-numeric: tabular-nums; min-height: 1.4em; }
 
 #typer { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
@@ -263,6 +265,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
       <button class="btn" id="enter" disabled>Enter the module</button>
       <div id="progress">Generating Earth…</div>
     </div>
+    <p class="truco">* <b>IDDQD</b>: god mode in DOOM, and it forces a delivery in Orbita.</p>
   </div>
 </div>
 
