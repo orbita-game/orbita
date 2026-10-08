@@ -137,7 +137,7 @@ body { background: var(--void); color: var(--hull); font-family: var(--mono); ov
   click grabs and drops things · <kbd>middle button</kbd> throws it (hold for more force) · wheel moves it closer or farther<br>
   <kbd>right button</kbd> + mouse turns what you hold · + scroll wheel tilts it<br>
   click the computer to use it · <kbd>Ctrl</kbd>+<kbd>Space</kbd> get up<br>
-  <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine · <kbd>L</kbd> lights · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
+  <kbd>T</kbd> speed up or stop time · <kbd>R</kbd> read a magazine ·  <kbd>L</kbd> lights · <kbd>C</kbd> flashlight · <kbd>P</kbd> music · <kbd>M</kbd> sound<br>
   <kbd>F</kbd> or right double-click opens a capsule · <kbd>X</kbd> discards what you hold or look at · <kbd>Z</kbd> brings it back<br>
   aim at a wall with something in hand to stick it with velcro · <kbd>Shift</kbd>+click drops it without sticking
 </div>
@@ -5176,6 +5176,12 @@ const ANNEX = { state: 'none', g: null, dz: 0, t: 0, dur: 30, doorT: 0, doorOpen
 const ANNEX_NAMES = ['AURORA', 'COMETA', 'ESTELA', 'NEBULOSA', 'ORIÓN', 'POLARIS', 'SIRIO', 'ZÉNIT', 'VEGA', 'CENTELLA'];
 const annexDesk = () => ({ x: 1.45, top: 0.95, za: ANNEX.z0 + 1.7, zb: ANNEX.z0 + 3.5 });
 // las luces del módulo existen desde el principio, apagadas: así no se recompila nada cuando llega
+// el módulo nuevo está a oscuras: sus superficies reflejan poco y se recorre con la linterna (C)
+const ANNEX_DARK = 0.28;
+const annexShutMat = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.25, metalness: 0.85 });
+const torch = { on: false, light: new THREE.SpotLight(0xfff0d6, 0, 16, 0.45, 0.5, 1.1), dir: new THREE.Vector3() };
+scene.add(torch.light, torch.light.target);
+function toggleTorch() { torch.on = !torch.on; click(); toast(torch.on ? 'Flashlight on.' : 'Flashlight off.', 1500); }
 ANNEX.lights = [0, 1].map((k) => { const l = new THREE.PointLight(0xffd9a8, 0, 7.5, 2); l.position.set(0, POD.C + 1.2, ANNEX.z0 + 2.5 + k * 4.5); scene.add(l); return l; });
 // del lado de adentro: el aro de acople, la escotilla y el panel
 const dockAdapter = new THREE.Group(); dockAdapter.visible = false; scene.add(dockAdapter);
@@ -5311,7 +5317,24 @@ function buildAnnex(def) {
   // pasamanos, como en el nuestro
   add(0.03, 0.03, 7.6, ribM, -1.95, POD.C - 1.15, (A.z0 + A.z1) / 2);
   g.traverse((m) => { if (m.isMesh) m.receiveShadow = true; });
+  // tapa del túnel: mientras se acerca no se ve nada de adentro
+  const hatch = new THREE.Mesh(new THREE.CircleGeometry(DOCK.r + 0.1, 40), annexShutMat);
+  hatch.position.set(0, POD.C, POD.z0 - 0.13); g.add(hatch);
+  A.hatch = hatch; A.glass = []; A.sealed = null; A.hint = false;
+  const dark = new Set();
+  g.traverse((m) => {
+    if (!m.isMesh) return;
+    if (m.material === glassMat) { A.glass.push(m); return; }
+    [].concat(m.material).forEach((mm) => { if (mm && mm.color && mm !== annexShutMat && !dark.has(mm)) { dark.add(mm); mm.color.multiplyScalar(ANNEX_DARK); if (mm.emissiveIntensity) mm.emissiveIntensity *= 0.35; } });
+  });
   return g;
+}
+// cerrado (vidrios espejados y tapa) mientras se acerca o se va; abierto cuando está acoplado
+function annexSeal(sealed) {
+  if (ANNEX.sealed === sealed || !ANNEX.glass) return;
+  ANNEX.sealed = sealed;
+  ANNEX.glass.forEach((m) => { m.material = sealed ? annexShutMat : glassMat; });
+  ANNEX.hatch.visible = sealed;
 }
 // lugares en las paredes para la decoración: nunca en las ventanas ni sobre el escritorio
 function annexSlots(def) {
@@ -5404,7 +5427,7 @@ function annexArrive(fast) {
   ANNEX.state = 'approach'; ANNEX.t = 0; ANNEX.dur = fast ? 12 : 35; ANNEX.dz = 140;
   ANNEX.g.position.set(3, 1.5, -ANNEX.dz); scene.add(ANNEX.g);
   beep(440, 0.15); setTimeout(() => beep(330, 0.25), 200);
-  toast('The sonar found a whole satellite: module ' + name + ', from ' + PAISES[pais][0] + ', with things from ' + year + '. Se acerca por la ventana de adelante para acoplarse.', 10000);
+  toast('The sonar found a whole satellite: module ' + name + ', from ' + PAISES[pais][0] + ', with things from ' + year + '. It is approaching the front window to dock.', 10000);
   fillAnnex();
   drawDockPanel();
   return true;
@@ -5449,7 +5472,22 @@ function updateAnnex(dt) {
   if (!SALV.annexAt) { SALV.annexAt = Date.now() + (60 + Math.random() * 90) * 60e3; saveSalv(); }
   if (!SALV.annex && ANNEX.state === 'none' && Date.now() >= SALV.annexAt && state !== 'menu') annexArrive(false);
   const on = ANNEX.state === 'none' ? 0 : 1;
-  ANNEX.lights.forEach((l) => { l.intensity = 0.9 * on; l.position.z = (l.userData.z0 = l.userData.z0 != null ? l.userData.z0 : l.position.z) - ANNEX.dz; });
+  if (ANNEX.g) annexSeal(ANNEX.state !== 'docked');
+  // linterna: sale de los ojos hacia donde se mira
+  camera.getWorldDirection(torch.dir);
+  torch.light.intensity = torch.on ? 3.2 : 0;
+  if (torch.on) { torch.light.position.copy(camera.position).addScaledVector(torch.dir, 0.1); torch.light.target.position.copy(camera.position).addScaledVector(torch.dir, 5); torch.light.target.updateMatrixWorld(); }
+  // lo que está del otro lado también queda en penumbra (solo las caras con imagen, que son de cada cosa)
+  if (ANNEX.state === 'docked') {
+    if (!ANNEX.hint && player.pos.z < POD.z0 - 0.6 && !torch.on) { ANNEX.hint = true; toast('It\'s dark in here. Turn on the flashlight with C.', 6000); }
+    items.forEach((it) => {
+      const dk = !it.gone && it.g.position.z < POD.z0 - 0.3;
+      if (it.annexDark === dk) return;
+      it.annexDark = dk;
+      it.g.traverse((m) => { if (m.isMesh && m.material && m.material.map && m.material.color) { const c0 = m.userData.c0 || (m.userData.c0 = m.material.color.clone()); m.material.color.copy(c0).multiplyScalar(dk ? ANNEX_DARK + 0.12 : 1); } });
+    });
+  }
+  ANNEX.lights.forEach((l) => { l.intensity = 0.08 * on; l.position.z = (l.userData.z0 = l.userData.z0 != null ? l.userData.z0 : l.position.z) - ANNEX.dz; });
   if (ANNEX.state === 'approach') {
     ANNEX.t += dt;
     const k = clamp(ANNEX.t / ANNEX.dur, 0, 1), e = easeOut(k);
@@ -5464,7 +5502,7 @@ function updateAnnex(dt) {
     ANNEX.g.position.set(-2 * e, 2 * e, -ANNEX.dz); ANNEX.g.rotation.z = -0.3 * e;
     if (k >= 1) {
       scene.remove(ANNEX.g);
-      ANNEX.g.traverse((m) => { if (m.isMesh) { m.geometry.dispose(); const ms = Array.isArray(m.material) ? m.material : [m.material]; ms.forEach((mm) => { if (mm !== glassMat) { if (mm.map) mm.map.dispose(); mm.dispose(); } }); } });
+      ANNEX.g.traverse((m) => { if (m.isMesh) { m.geometry.dispose(); const ms = Array.isArray(m.material) ? m.material : [m.material]; ms.forEach((mm) => { if (mm !== glassMat && mm !== annexShutMat) { if (mm.map) mm.map.dispose(); mm.dispose(); } }); } });
       ANNEX.g = null; ANNEX.state = 'none'; ANNEX.dz = 0;
     }
   }
@@ -6202,6 +6240,7 @@ window.addEventListener('keydown', (e) => {
       else if (!openAimed()) walkClick();
     }
     if (e.code === 'KeyL') toggleCeiling();
+    if (e.code === 'KeyC' && state === 'walk') toggleTorch();
     if (e.code === 'KeyP') deckAction('play');
     if (e.code === 'KeyX' && state === 'walk') discardItem();
     if (e.code === 'KeyZ' && state === 'walk') undoDiscard();
