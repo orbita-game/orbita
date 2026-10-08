@@ -2564,9 +2564,9 @@ async function commonsDecor(year, carteles, paisK) {
   const pais = COMMONS_PAIS[paisK != null ? paisK : AO_RANDOM.pais];
   const shuffle = (a) => a.filter(Boolean).sort(() => Math.random() - 0.5);
   const qs = carteles
-    ? [...shuffle([`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`]), ...shuffle([`incategory:"${year} video games" poster`, `"video game" advertisement ${year}`, `"arcade flyer" ${year}`])]
+    ? [...shuffle([`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`]), ...shuffle([`incategory:"${year} video games" poster`, `"video game" advertisement ${year}`, `"arcade flyer" ${year}`]), ...shuffle(ADS_Q(year, pais)).slice(0, 3)]
     : shuffle([pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`]);
-  if (carteles) { const k = Math.random() < 0.5 ? 0 : 3; qs.unshift(...qs.splice(k, 3)); }
+  if (carteles) { const k = [0, 3, 6][Math.floor(Math.random() * 3)]; qs.unshift(...qs.splice(k, 3)); }
   for (const q of qs) {
     const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
       + encodeURIComponent('filetype:bitmap ' + q + COMMONS_AVOID) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
@@ -2587,9 +2587,10 @@ async function commonsDecor(year, carteles, paisK) {
   return null;
 }
 // varios de una vez (para los satélites que se acoplan): imágenes más chicas, así entran muchas
+const ADS_Q = (year, pais) => [pais && `incategory:"${year} advertisements in ${pais}"`, `incategory:"${year} advertisements"`, `"advertising poster" ${year}`, `advertisement poster ${year}`, `"magazine advertisement" ${year}`, `"print advertisement" ${year}`, `"advertising" ${year} poster`].filter(Boolean);
 async function commonsMany(year, carteles, paisK, n) {
   const pais = COMMONS_PAIS[paisK != null ? paisK : AO_RANDOM.pais], out = [];
-  const qs = carteles
+  const qs = carteles === 'publicidad' ? ADS_Q(year, pais) : carteles
     ? [`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`, `incategory:"${year} video games" poster`, `"arcade flyer" ${year}`, `"video game" advertisement ${year}`]
     : [pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`].filter(Boolean);
   for (const q of qs) {
@@ -5370,10 +5371,11 @@ async function fillAnnex() {
   // al menos 50 pósters y fotos en las paredes: primero de películas y videojuegos, después del país y el año
   const nPost = () => A.ids.filter((id) => /^deco:/.test(id)).length;
   if (AO_RANDOM.on) {
-    for (const [carteles, pk] of [[true, A.pais], [false, A.pais], [true, ''], [false, '']]) {
+    for (const [carteles, pk] of [[true, A.pais], ['publicidad', A.pais], [false, A.pais], [true, ''], ['publicidad', ''], [false, '']]) {
       if (nPost() >= ANNEX_POSTERS || SALV.annex !== A) break;
       let list = [];
-      try { list = await commonsMany(A.year, carteles, pk, ANNEX_POSTERS - nPost()); } catch (err) { continue; }
+      // de cada tipo, a lo sumo la mitad: así hay de películas, de publicidades y fotos
+      try { list = await commonsMany(A.year, carteles, pk, Math.min(ANNEX_POSTERS - nPost(), pk === '' ? 50 : 20)); } catch (err) { continue; }
       for (const e of list) {
         if (SALV.annex !== A) break;
         const id = linkId(e);
