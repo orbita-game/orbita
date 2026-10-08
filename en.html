@@ -2488,7 +2488,8 @@ const AVOID_RE = new RegExp('\\b(' + AVOID_WORDS.concat(['nazismo', 'fascismo', 
 const avoided = (t) => AVOID_RE.test(String(t || ''));
 // todo tiene que ser de los 80 y los 90: un título que nombra otro año ("1933", "2004") no entra
 const offEra = (t) => (String(t || '').match(/(?<![\d.\/-])(19\d\d|20[0-2]\d)(?![\d])/g) || []).some((y) => +y < 1980 || +y > 1999);
-const AO_AVOID = ' AND NOT (' + AVOID_WORDS.map((w) => /\s/.test(w) ? '"' + w + '"' : w).map((w) => 'subject:' + w + ' OR title:' + w).join(' OR ') + ')';
+// en la búsqueda va una lista corta (la larga hace fallar a archive.org); el filtro completo se aplica después, acá
+const AO_AVOID = ' AND NOT subject:(' + ['nazi', 'hitler', 'holocaust', 'propaganda', 'racism', 'politics', '"civil rights"', 'communism', 'fascism'].join(' OR ') + ')';
 const COMMONS_AVOID = ' ' + AVOID_WORDS.filter((w) => !/\s/.test(w)).map((w) => '-' + w).join(' ');
 const AO_Q = {
   videos: 'mediatype:movies AND (collection:classic_tv OR collection:feature_films OR collection:classic_tv_commercials OR collection:television OR collection:moviesandfilms OR collection:computerchronicles)',
@@ -2521,14 +2522,17 @@ async function aoSearch(q, rows, page, sort) {
   const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q) + '&fl[]=identifier&fl[]=title&fl[]=subject' + (sort ? '&sort[]=' + encodeURIComponent(sort) : '') + '&rows=' + rows + '&page=' + page + '&output=json';
   let j;
   try { const r = await fetch(url); if (!r.ok) throw new Error(r.status); j = await r.json(); } catch (e) { j = await jsonp(url); }
-  return j.response || { numFound: 0, docs: [] };
+  if (!j || !j.response) throw new Error((j && j.error) || 'archive.org sin respuesta');
+  return j.response;
 }
 // best: lo mejor que haya, entre lo más visto de archive.org para ese año
 async function aoRandomItem(year, cat, best, paisK) {
   const base = AO_Q[cat] + ' AND year:' + year + AO_AVOID;
-  for (const q of [base + countryFilter(cat, paisK), base]) {
+  const plain = AO_Q[cat] + ' AND year:' + year;
+  for (const q of [base + countryFilter(cat, paisK), base, plain]) {
     // representativo del año: entre lo más visto de ese año (lo mejor: entre los primeros 15)
-    const top = (await aoSearch(q, best ? 40 : 120, 1, 'downloads desc')).docs || [];
+    let top;
+    try { top = (await aoSearch(q, best ? 40 : 120, 1, 'downloads desc')).docs || []; } catch (err) { if (q === plain) throw err; continue; }
     const n = top.length;
     if (!n) continue;
     for (let tries = 0; tries < 6; tries++) {
@@ -2607,8 +2611,8 @@ async function fillRandom(cid, count, best) {
   c.pending = count; saveSalv();
   const rest = AO_MIX.filter((k) => k !== 'decoracion').sort(() => Math.random() - 0.5);
   // casi siempre llega un póster de una película o de un videojuego de ese año
-  const order = ['carteles', 'decoracion', ...new Set(rest), 'carteles', ...rest];
-  let got = 0, fails = 0;
+  const order = ['carteles', ...new Set(rest), ...rest, 'decoracion'];
+  let got = 0, fails = 0, aoFails = 0;
   const add = (e) => {
     const id = linkId(e);
     if (SALV.got.includes(id) || c.ids.includes(id) || !registerEntry(e.year, e.cat, e)) return false;
@@ -2619,11 +2623,11 @@ async function fillRandom(cid, count, best) {
     if (state === 'panel' && panelName === 'loot' && LOOT.cid === cid) renderLoot();
     return true;
   };
-  for (let k = 0; k < order.length && got < count && fails < 4; k++) {
+  for (let k = 0; k < order.length && got < count && aoFails < 3; k++) {
     const cat = order[k];
     let e = null;
     if (cat === 'decoracion' || cat === 'carteles') { try { e = await commonsDecor(c.year, cat === 'carteles'); } catch (err) { fails++; } }
-    if (!e) { try { e = await aoRandomItem(c.year, cat, best); } catch (err) { fails++; continue; } }
+    if (!e) { try { e = await aoRandomItem(c.year, cat, best); } catch (err) { fails++; aoFails++; continue; } }
     if (e && e.cat === 'carteles') e.cat = 'decoracion';
     if (e) add(e);
   }
@@ -2634,7 +2638,7 @@ async function fillRandom(cid, count, best) {
   }
   c.pending = 0; saveSalv();
   if (state === 'panel' && panelName === 'loot' && LOOT.cid === cid) renderLoot();
-  if (fails >= 4 && !AO_RANDOM.offlineWarned) { AO_RANDOM.offlineWarned = true; toast('I couldn\'t reach archive.org or Wikimedia: this capsule came with whatever was at hand.', 8000); }
+  if ((fails >= 4 || aoFails >= 3) && !AO_RANDOM.offlineWarned) { AO_RANDOM.offlineWarned = true; toast('I couldn\'t reach archive.org or Wikimedia: this capsule came with whatever was at hand.', 8000); }
 }
 
 /* ---------- lector de revistas ---------- */
@@ -5351,7 +5355,7 @@ function annexArrive(fast) {
   ANNEX.state = 'approach'; ANNEX.t = 0; ANNEX.dur = fast ? 12 : 35; ANNEX.dz = 140;
   ANNEX.g.position.set(3, 1.5, -ANNEX.dz); scene.add(ANNEX.g);
   beep(440, 0.15); setTimeout(() => beep(330, 0.25), 200);
-  toast('The sonar found a whole satellite: module ' + name + ', from ' + PAISES[pais][0] + ', with things from ' + year + '. It is approaching the front window to dock.', 10000);
+  toast('The sonar found a whole satellite: module ' + name + ', from ' + PAISES[pais][0] + ', with things from ' + year + '. Se acerca por la ventana de adelante para acoplarse.', 10000);
   fillAnnex();
   drawDockPanel();
   return true;
