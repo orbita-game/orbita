@@ -2586,6 +2586,32 @@ async function commonsDecor(year, carteles, paisK) {
   }
   return null;
 }
+// varios de una vez (para los satélites que se acoplan): imágenes más chicas, así entran muchas
+async function commonsMany(year, carteles, paisK, n) {
+  const pais = COMMONS_PAIS[paisK != null ? paisK : AO_RANDOM.pais], out = [];
+  const qs = carteles
+    ? [`incategory:"${year} film posters"`, `"film poster" ${year}`, `"movie poster" ${year}`, `incategory:"${year} video games" poster`, `"arcade flyer" ${year}`, `"video game" advertisement ${year}`]
+    : [pais && `incategory:"${year} in ${pais}"`, `incategory:"${year} posters"`, `incategory:"${year} advertisements"`, pais && `incategory:"${year} photographs of ${pais}"`, `incategory:"${year} photographs"`].filter(Boolean);
+  for (const q of qs) {
+    if (out.length >= n) break;
+    const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
+      + encodeURIComponent('filetype:bitmap ' + q + COMMONS_AVOID) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=512';
+    const r = await fetch(url); if (!r.ok) throw new Error(r.status);
+    const jr = await r.json();
+    if (jr.error) throw new Error(jr.error.info || jr.error.code);
+    const pages = Object.values((jr.query || {}).pages || {}).filter((p) => p.imageinfo && p.imageinfo[0].thumburl && p.imageinfo[0].width >= 300).sort(() => Math.random() - 0.5);
+    for (const p of pages) {
+      if (out.length >= n) break;
+      const ii = p.imageinfo[0], nombre = p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/[_\s]+/g, ' ').slice(0, 44);
+      if (avoided(p.title) || offEra(p.title)) continue;
+      const tk = titleKey(nombre);
+      if (SALV.aoSeen.includes(ii.thumburl) || SALV.aoTitles.includes(tk)) continue;
+      SALV.aoSeen.push(ii.thumburl); SALV.aoTitles.push(tk);
+      out.push({ year, cat: 'decoracion', url: ii.thumburl, nombre });
+    }
+  }
+  return out;
+}
 // si no llegó nada de la red, la cápsula igual trae algo: una postal de recuerdo de ese año
 function genDecor(year, n0) {
   if (!SALV.gens) SALV.gens = [];
@@ -5289,9 +5315,9 @@ function buildAnnex(def) {
 // lugares en las paredes para la decoración: nunca en las ventanas ni sobre el escritorio
 function annexSlots(def) {
   const rnd = mulberry(def.seed + 7), out = [];
-  [1, 2, 3, 5, 6, 7].forEach((i) => { for (let sgi = 1; sgi < 8; sgi++) { if (ANNEX.win.has(i + ':' + sgi) || ((i === 1 || i === 2) && sgi <= 3)) continue; out.push([i, sgi]); } });
+  [1, 2, 3, 4, 5, 6, 7].forEach((i) => { for (let sgi = 1; sgi < 8; sgi++) { if (ANNEX.win.has(i + ':' + sgi) || ((i === 1 || i === 2) && sgi <= 3)) continue; out.push([i, sgi]); } });
   for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
-  return out.map(([i, sgi]) => ({ i, sgi, dz: (rnd() - 0.5) * 0.35, dl: (rnd() - 0.5) * 0.3 }));
+  return out.flatMap(([i, sgi]) => [-1, 1].map((k) => ({ i, sgi, dz: (rnd() - 0.5) * 0.24, dl: k * 0.42 + (rnd() - 0.5) * 0.08 })));
 }
 const _sn = new THREE.Vector3();
 function stickAt(it, point, n) {
@@ -5320,12 +5346,15 @@ function placeAnnexItem(id) {
   saveItems(); saveSalv();
 }
 // lo que trae: pósters y fotos de ese país y ese año, y alguna película, revista o música, todo pegado con velcro
+const ANNEX_POSTERS = 50;
 async function fillAnnex() {
   const A = SALV.annex;
-  if (!A || A.filled || A.filling) return;
+  // uno que ya llegó con pocos pósters (de antes) se completa; lo demás no se vuelve a traer
+  if (!A || A.filling || (A.filled && A.ids.filter((id) => /^deco:/.test(id)).length >= ANNEX_POSTERS)) return;
+  const again = A.filled;
   A.filling = true;
   const add = (id) => { if (!A.ids.includes(id)) A.ids.push(id); if (!SALV.got.includes(id)) SALV.got.push(id); saveSalv(); placeAnnexItem(id); };
-  if (AO_RANDOM.on) {
+  if (AO_RANDOM.on && !again) {
     let fails = 0;
     for (const cat of ['carteles', 'decoracion', 'decoracion', 'videos', 'carteles', 'revistas', 'decoracion', 'musica', 'decoracion']) {
       if (fails >= 4 || SALV.annex !== A) break;
@@ -5336,6 +5365,21 @@ async function fillAnnex() {
       const id = linkId(e);
       if (SALV.got.includes(id) || !registerEntry(e.year, e.cat, e)) continue;
       SALV.aoEntries.push(e); add(id);
+    }
+  }
+  // al menos 50 pósters y fotos en las paredes: primero de películas y videojuegos, después del país y el año
+  const nPost = () => A.ids.filter((id) => /^deco:/.test(id)).length;
+  if (AO_RANDOM.on) {
+    for (const [carteles, pk] of [[true, A.pais], [false, A.pais], [true, ''], [false, '']]) {
+      if (nPost() >= ANNEX_POSTERS || SALV.annex !== A) break;
+      let list = [];
+      try { list = await commonsMany(A.year, carteles, pk, ANNEX_POSTERS - nPost()); } catch (err) { continue; }
+      for (const e of list) {
+        if (SALV.annex !== A) break;
+        const id = linkId(e);
+        if (SALV.got.includes(id) || !registerEntry(e.year, e.cat, e)) continue;
+        SALV.aoEntries.push(e); add(id);
+      }
     }
   }
   if (SALV.annex !== A) return;
@@ -5370,7 +5414,7 @@ function annexDock() {
   noiseBurst(0.6, 'lowpass', 180, 0.6, 1); setTimeout(() => noiseBurst(0.25, 'bandpass', 900, 0.25, 2), 250);
   toast('Acople completo con ' + SALV.annex.name + '. Abrí la escotilla con el botón verde, abajo de la ventana de adelante.', 9000);
   SALV.annex.ids.forEach(placeAnnexItem);
-  if (!SALV.annex.filled) fillAnnex();
+  fillAnnex();
   drawDockPanel();
 }
 function setDockDoor(open) {
@@ -6537,7 +6581,7 @@ loadManifest().then((hasManifest) => {
     const m = /^(?:disk|box):(.+)$/.exec(id);
     if (m && DISKS[m[1]] && !itemById('disk:' + m[1]) && !(itemState['disk:' + m[1]] || {}).gone) makeDisk(m[1], 0, new THREE.Vector3(0.2, 1.3, -1.2));
   });
-  if (SALV.annex) { SALV.annex.ids.forEach(placeAnnexItem); if (!SALV.annex.filled) fillAnnex(); }
+  if (SALV.annex) { SALV.annex.ids.forEach(placeAnnexItem); SALV.annex.filling = false; fillAnnex(); }
   saveSalv(); drawAirPanel(); drawSonar();
 });
 STATIONS.forEach((st) => drawDrive(st));
