@@ -2490,7 +2490,8 @@ const avoided = (t) => AVOID_RE.test(String(t || ''));
 const offEra = (t) => (String(t || '').match(/(?<![\d.\/-])(19\d\d|20[0-2]\d)(?![\d])/g) || []).some((y) => +y < 1980 || +y > 1999);
 // en la búsqueda va una lista corta (la larga hace fallar a archive.org); el filtro completo se aplica después, acá
 const AO_AVOID = ' AND NOT subject:(' + ['nazi', 'hitler', 'holocaust', 'propaganda', 'racism', 'politics', '"civil rights"', 'communism', 'fascism'].join(' OR ') + ')';
-const COMMONS_AVOID = ' ' + AVOID_WORDS.filter((w) => !/\s/.test(w)).map((w) => '-' + w).join(' ');
+// Wikimedia no acepta búsquedas de más de 300 letras: van pocas palabras y el filtro completo se aplica acá
+const COMMONS_AVOID = ' -nazi -hitler -holocaust -propaganda -racism';
 const AO_Q = {
   videos: 'mediatype:movies AND (collection:classic_tv OR collection:feature_films OR collection:classic_tv_commercials OR collection:television OR collection:moviesandfilms OR collection:computerchronicles)',
   juegos: 'collection:softwarelibrary_msdos_games',
@@ -2570,7 +2571,9 @@ async function commonsDecor(year, carteles, paisK) {
     const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch='
       + encodeURIComponent('filetype:bitmap ' + q + COMMONS_AVOID) + '&prop=imageinfo&iiprop=url|size&iiurlwidth=960';
     const r = await fetch(url); if (!r.ok) throw new Error(r.status);
-    const pages = Object.values(((await r.json()).query || {}).pages || {}).filter((p) => p.imageinfo && p.imageinfo[0].thumburl && p.imageinfo[0].width >= 300);
+    const jr = await r.json();
+    if (jr.error) throw new Error(jr.error.info || jr.error.code);
+    const pages = Object.values((jr.query || {}).pages || {}).filter((p) => p.imageinfo && p.imageinfo[0].thumburl && p.imageinfo[0].width >= 300);
     for (let tries = 0; tries < 8 && pages.length; tries++) {
       const p = pages.splice(Math.floor(Math.random() * pages.length), 1)[0], ii = p.imageinfo[0];
       const nombre = p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/[_\s]+/g, ' ').slice(0, 44);
